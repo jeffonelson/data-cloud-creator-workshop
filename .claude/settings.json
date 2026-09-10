@@ -1,0 +1,19 @@
+{
+  "enabledMcpjsonServers": [
+    "google_developer_knowledge",
+    "maps_grounding_lite",
+    "cloud_run"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__google_developer_knowledge__search_documents",
+      "mcp__google_developer_knowledge__get_documents",
+      "mcp__google_developer_knowledge__answer_query",
+      "mcp__maps_grounding_lite__search_places",
+      "mcp__maps_grounding_lite__lookup_weather",
+      "mcp__maps_grounding_lite__compute_routes",
+      "mcp__cloud_run__get_service",
+      "mcp__cloud_run__list_services"
+    ]
+  }
+}

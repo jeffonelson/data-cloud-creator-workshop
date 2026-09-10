@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+state_dir="$(workshop_state_dir)"
+
+removed_anything=false
+
+if [[ -f "$state_dir/plugin-added-by-workshop" ]]; then
+  workshop_info "Removing Codex plugin installed by this workshop checkout..."
+  codex plugin remove "$DAK_PLUGIN"
+  rm -f "$state_dir/plugin-added-by-workshop"
+  removed_anything=true
+fi
+
+if [[ -f "$state_dir/marketplace-added-by-workshop" ]]; then
+  workshop_info "Removing Codex marketplace added by this workshop checkout..."
+  codex plugin marketplace remove "$DAK_MARKETPLACE"
+  rm -f "$state_dir/marketplace-added-by-workshop"
+  removed_anything=true
+fi
+
+if [[ -f "$state_dir/claude-plugin-added-by-workshop" ]]; then
+  workshop_info "Removing Claude Code plugin installed by this workshop checkout..."
+  claude plugin uninstall "$DAK_PLUGIN" --yes
+  rm -f "$state_dir/claude-plugin-added-by-workshop"
+  removed_anything=true
+fi
+
+if [[ -f "$state_dir/claude-marketplace-added-by-workshop" ]]; then
+  workshop_info "Removing Claude Code marketplace added by this workshop checkout..."
+  claude plugin marketplace remove "$DAK_MARKETPLACE"
+  rm -f "$state_dir/claude-marketplace-added-by-workshop"
+  removed_anything=true
+fi
+
+if [[ -f "$state_dir/project.env" ]]; then
+  rm -f "$state_dir/project.env"
+  workshop_ok "Removed this checkout's workshop project selection."
+  removed_anything=true
+fi
+
+# Avoid leaving an empty ignored state directory behind. Preserve it when it
+# contains any unrecognized files.
+rmdir "$state_dir" 2>/dev/null || true
+
+if [[ "$removed_anything" == false ]]; then
+  workshop_ok "Nothing to remove: this checkout did not record any agent changes."
+  exit 0
+fi
+
+workshop_print_line "$WORKSHOP_SGR_GREEN$WORKSHOP_SGR_BOLD" 1 "Teardown complete. Remove the checkout to remove its project-scoped MCP configuration."

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Runs the Data Agent Kit's bundled MCP proxy against one Google Cloud MCP
+# endpoint, so this repository's own MCP servers reuse the plugin's Application
+# Default Credentials handling instead of refreshing OAuth tokens a second time.
+#
+# Both agents install the plugin under a directory named for the plugin
+# version, so the proxy path cannot be committed to .mcp.json or
+# .codex/config.toml. The launchers resolve it once and export
+# WORKSHOP_DAK_PROXY; this script resolves it itself when started outside a
+# launcher, which costs a plugin listing but keeps the server working.
+#
+# Usage: bin/mcp-dak-proxy MCP_ENDPOINT_URL
+#
+# stdout carries the MCP stream. Every diagnostic here goes to stderr, and
+# nothing in this path handles an API key.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+if (( $# != 1 )); then
+  echo "Usage: $0 MCP_ENDPOINT_URL" >&2
+  exit 2
+fi
+
+endpoint_url="$1"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Cannot start the MCP proxy: node is not installed." >&2
+  exit 1
+fi
+
+proxy_path="${WORKSHOP_DAK_PROXY:-}"
+
+if [[ -z "$proxy_path" || ! -f "$proxy_path" ]]; then
+  if ! proxy_path="$(workshop_dak_proxy_path)"; then
+    echo "Cannot locate the Data Agent Kit MCP proxy for: $endpoint_url" >&2
+    echo "Install the plugin with ./bin/setup PROJECT_ID, then run ./bin/doctor." >&2
+    exit 1
+  fi
+fi
+
+exec node "$proxy_path" "$endpoint_url"

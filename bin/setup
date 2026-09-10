@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+state_dir="$(workshop_state_dir)"
+mkdir -p "$state_dir"
+project_state="$(workshop_project_state_file)"
+
+if (( $# > 1 )); then
+  echo "Usage: $0 PROJECT_ID" >&2
+  exit 2
+fi
+
+if [[ -n "${1:-}" ]]; then
+  GCP_PROJECT_ID="$1"
+else
+  GCP_PROJECT_ID="$(workshop_saved_project)"
+fi
+
+if [[ -z "$GCP_PROJECT_ID" ]]; then
+  echo "Usage: $0 PROJECT_ID" >&2
+  echo "Use the dedicated Google Cloud project assigned to you." >&2
+  exit 2
+fi
+
+if ! workshop_project_id_is_valid "$GCP_PROJECT_ID"; then
+  workshop_error "Invalid Google Cloud project ID: $GCP_PROJECT_ID"
+  exit 2
+fi
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    workshop_error "Missing required command: $1"
+    exit 1
+  fi
+}
+
+require_command gcloud
+require_command node
+require_command npm
+
+# Configure whichever supported coding agents are installed. At least one is
+# required; both are configured when both are present.
+has_codex=false
+has_claude=false
+if command -v codex >/dev/null 2>&1; then
+  has_codex=true
+fi
+if command -v claude >/dev/null 2>&1; then
+  has_claude=true
+fi
+
+if [[ "$has_codex" == false && "$has_claude" == false ]]; then
+  workshop_error "No supported coding agent found. Install the Codex CLI, the Claude Code CLI, or both."
+  exit 1
+fi
+
+workshop_info "Checking Google Cloud CLI authentication..."
+active_account="$(gcloud auth list --project="$GCP_PROJECT_ID" --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+if [[ -z "$active_account" ]]; then
+  workshop_error "No active gcloud account. Run: gcloud auth login"
+  exit 1
+fi
+
+if ! gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+  workshop_error "Application Default Credentials are unavailable."
+  workshop_hint "Run: gcloud auth application-default login"
+  exit 1
+fi
+
+if ! gcloud projects describe "$GCP_PROJECT_ID" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+  workshop_error "The active account cannot access project: $GCP_PROJECT_ID"
+  workshop_hint "Check project IAM and the active gcloud account."
+  exit 1
+fi
+
+for secret_id in "$DK_SECRET_ID" "$MAPS_SECRET_ID"; do
+  if ! gcloud secrets versions access "$SECRET_VERSION" \
+    --secret="$secret_id" \
+    --project="$GCP_PROJECT_ID" \
+    >/dev/null 2>&1; then
+    workshop_error "Cannot access Secret Manager secret: $secret_id"
+    workshop_hint "Ask a workshop administrator to provision your assigned project."
+    exit 1
+  fi
+done
+
+umask 077
+printf 'GCP_PROJECT_ID=%s\n' "$GCP_PROJECT_ID" >"$project_state"
+workshop_ok "Workshop project $GCP_PROJECT_ID and Secret Manager access are ready."
+
+if [[ "$has_codex" == true ]]; then
+  echo
+  workshop_info "Configuring Codex..."
+
+  marketplace_entry="$(workshop_agent_entry codex marketplace)"
+  if [[ "$marketplace_entry" != null ]]; then
+    workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
+  else
+    # Codex takes the ref as a flag; Claude Code takes it as a URL fragment
+    # further down. Both read the same DAK_REF, and both track the default
+    # branch when it is empty.
+    if [[ -n "${DAK_REF:-}" ]]; then
+      workshop_info "Adding Data Agent Kit marketplace at ref: $DAK_REF"
+      codex plugin marketplace add "$DAK_REPOSITORY" --ref "$DAK_REF"
+    else
+      workshop_info "Adding Data Agent Kit marketplace at the default branch"
+      codex plugin marketplace add "$DAK_REPOSITORY"
+    fi
+    touch "$state_dir/marketplace-added-by-workshop"
+  fi
+
+  plugin_entry="$(workshop_agent_entry codex plugin)"
+  if [[ "$plugin_entry" != null ]]; then
+    workshop_ok "Plugin already installed: $DAK_PLUGIN"
+  else
+    workshop_info "Installing Data Agent Kit plugin..."
+    codex plugin add "$DAK_PLUGIN"
+    touch "$state_dir/plugin-added-by-workshop"
+  fi
+fi
+
+if [[ "$has_claude" == true ]]; then
+  echo
+  workshop_info "Configuring Claude Code..."
+
+  # Installed at user scope, matching how Claude Code plugins are normally
+  # installed. The plugin is therefore enabled in every project the attendee
+  # opens until ./bin/teardown runs.
+  marketplace_entry="$(workshop_agent_entry claude marketplace)"
+  if [[ "$marketplace_entry" != null ]]; then
+    workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
+  else
+    # Claude Code takes the ref as a git URL fragment.
+    dak_marketplace_source="$DAK_REPOSITORY.git"
+    if [[ -n "${DAK_REF:-}" ]]; then
+      workshop_info "Adding Data Agent Kit marketplace at ref: $DAK_REF"
+      dak_marketplace_source="$dak_marketplace_source#$DAK_REF"
+    else
+      workshop_info "Adding Data Agent Kit marketplace at the default branch"
+    fi
+    claude plugin marketplace add "$dak_marketplace_source"
+    touch "$state_dir/claude-marketplace-added-by-workshop"
+  fi
+
+  plugin_entry="$(workshop_agent_entry claude plugin)"
+  if [[ "$plugin_entry" != null ]]; then
+    workshop_ok "Plugin already installed: $DAK_PLUGIN"
+  else
+    workshop_info "Installing Data Agent Kit plugin..."
+    # GCP_REGION is the only option the plugin declares since DAK 0.10.1.
+    # PROJECT_ID and BIGQUERY_LOCATION were removed upstream; the MCP servers
+    # take the project as a tool argument instead.
+    claude plugin install "$DAK_PLUGIN" --yes \
+      --config "GCP_REGION=$DAK_GCP_REGION"
+    touch "$state_dir/claude-plugin-added-by-workshop"
+  fi
+fi
+
+echo
+workshop_print_line "$WORKSHOP_SGR_GREEN$WORKSHOP_SGR_BOLD" 1 "Setup complete for project: $GCP_PROJECT_ID"
+if [[ "$has_codex" == true ]]; then
+  echo "Launch Codex with:        ./bin/workshop-codex"
+fi
+if [[ "$has_claude" == true ]]; then
+  echo "Launch Claude Code with:  ./bin/workshop-claude"
+fi
+echo "On first launch, trust this repository so the project-scoped MCP configuration loads."

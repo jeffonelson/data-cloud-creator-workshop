@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+if ! command -v codex >/dev/null 2>&1; then
+  workshop_error "Missing required command: codex"
+  exit 1
+fi
+
+workshop_prepare_launch codex
+workshop_info "Launching Codex for project: $WORKSHOP_PROJECT_ID"
+
+cd "$repo_root"
+exec codex "$@"

@@ -1,0 +1,4 @@
+.env.local
+.workshop-state/
+.claude/settings.local.json
+.DS_Store

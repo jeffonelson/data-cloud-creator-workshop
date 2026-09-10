@@ -1,0 +1,109 @@
+# Project-scoped MCP servers for the SVL workshop.
+# Codex loads this file only after the repository is trusted.
+
+[mcp_servers.google_developer_knowledge]
+url = "https://developerknowledge.googleapis.com/mcp"
+env_http_headers = { "X-Goog-Api-Key" = "WORKSHOP_DK_API_KEY" }
+enabled_tools = ["search_documents", "get_documents", "answer_query"]
+default_tools_approval_mode = "auto"
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+enabled = true
+required = false
+
+[mcp_servers.maps_grounding_lite]
+url = "https://mapstools.googleapis.com/mcp"
+env_http_headers = { "X-Goog-Api-Key" = "WORKSHOP_MAPS_API_KEY" }
+enabled_tools = ["search_places", "lookup_weather", "compute_routes"]
+default_tools_approval_mode = "auto"
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+enabled = true
+required = false
+
+# Cloud Run takes no API key: bin/mcp-dak-proxy runs the Data Agent Kit's
+# bundled proxy, which authenticates with the attendee's own Application
+# Default Credentials. Codex does not expand environment variables inside args,
+# so the command is a repository-relative path and the launcher's working
+# directory is what resolves it. env_vars forwards the resolved proxy location;
+# without it the script falls back to resolving the path itself.
+#
+# The two read-only tools are approved automatically. The deploy tools are not:
+# they create and replace real services, and a prompt before that is worth the
+# few seconds it costs.
+[mcp_servers.cloud_run]
+command = "./bin/mcp-dak-proxy"
+args = ["https://run.googleapis.com/mcp"]
+env_vars = ["WORKSHOP_DAK_PROXY"]
+enabled_tools = [
+  "get_service",
+  "list_services",
+  "deploy_service_from_image",
+  "deploy_service_from_archive",
+  "deploy_service_from_file_contents",
+]
+startup_timeout_sec = 30
+# Deploys are slower than a metadata read; the default timeout cuts them off.
+tool_timeout_sec = 180
+enabled = true
+required = false
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.cloud_run.tools.get_service]
+approval_mode = "auto"
+
+[mcp_servers.cloud_run.tools.list_services]
+approval_mode = "auto"
+
+# The Data Agent Kit plugin includes MCP servers for many Google Cloud products.
+# This workshop uses only its hosted BigQuery and AlloyDB servers; disabling the
+# rest keeps the Codex tool context focused. Developer Knowledge, Maps, and
+# Cloud Run above are separate project-scoped servers and remain enabled.
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.bigquery]
+enabled = true
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."alloydb-postgres"]
+enabled = true
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.bigtable]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."cloud-sql-postgresql"]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."cloud-storage"]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.dataproc]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.knowledge_catalog]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.notebook]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.spanner]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.visualization]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."alloydb-local"]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."bigquery-local"]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."developer-knowledge"]
+enabled = false
+
+[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."maps-grounding-lite"]
+enabled = false
+
+# Keep the API keys available to Codex's HTTP MCP client, but do not forward
+# them into shell commands launched by the agent. The legacy exclusion array
+# is intentional: Codex CLI 0.153.0 accepts the canonical `filters` map in a
+# project config but does not enforce it for agent-launched shell commands.
+[shell_environment_policy]
+exclude = ["WORKSHOP_DK_API_KEY", "WORKSHOP_MAPS_API_KEY"]

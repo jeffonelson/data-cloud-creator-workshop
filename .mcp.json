@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "google_developer_knowledge": {
+      "type": "http",
+      "url": "https://developerknowledge.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${WORKSHOP_DK_API_KEY}"
+      }
+    },
+    "maps_grounding_lite": {
+      "type": "http",
+      "url": "https://mapstools.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${WORKSHOP_MAPS_API_KEY}"
+      }
+    },
+    "cloud_run": {
+      "type": "stdio",
+      "command": "./bin/mcp-dak-proxy",
+      "args": ["https://run.googleapis.com/mcp"]
+    }
+  }
+}

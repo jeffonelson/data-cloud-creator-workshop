@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A concise guide to the Charlie's Coffee workshop data model.">
+  <meta name="theme-color" content="#f8fafd">
+  <title>Charlie's Coffee data landscape</title>
+  <script>
+    try {
+      if (localStorage.getItem("data-landscape-theme") === "dark") {
+        document.documentElement.dataset.theme = "dark";
+      }
+    } catch {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f8fafd;
+      --surface: #ffffff;
+      --surface-raised: #ffffff;
+      --ink: #202124;
+      --muted: #5f6368;
+      --rule: #dadce0;
+      --rule-strong: #bdc1c6;
+      --google-blue: #4285f4;
+      --google-red: #ea4335;
+      --google-yellow: #fbbc04;
+      --google-green: #34a853;
+      --alloy: #1a73e8;
+      --alloy-soft: #e8f0fe;
+      --query: #188038;
+      --query-soft: #e6f4ea;
+      --key: #c5221f;
+      --key-soft: #fce8e6;
+      --shadow: 0 12px 34px rgba(60, 64, 67, 0.09);
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #111315;
+      --surface: #1b1d20;
+      --surface-raised: #23262a;
+      --ink: #e8eaed;
+      --muted: #9aa0a6;
+      --rule: #3c4043;
+      --rule-strong: #5f6368;
+      --google-blue: #8ab4f8;
+      --google-red: #f28b82;
+      --google-yellow: #fdd663;
+      --google-green: #81c995;
+      --alloy: #8ab4f8;
+      --alloy-soft: #23385f;
+      --query: #81c995;
+      --query-soft: #203b2a;
+      --key: #f28b82;
+      --key-soft: #4a2927;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Google Sans Flex", "Google Sans", Roboto, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    body::before {
+      display: block;
+      width: 100%;
+      height: 5px;
+      background: linear-gradient(
+        90deg,
+        var(--google-blue) 0 34%,
+        var(--google-red) 34% 56%,
+        var(--google-yellow) 56% 74%,
+        var(--google-green) 74% 100%
+      );
+      content: "";
+    }
+
+    button {
+      font: inherit;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    .page-shell {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 38px 0 52px;
+    }
+
+    .intro {
+      margin-bottom: 24px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 2.65rem);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1.12;
+    }
+
+    .lede {
+      max-width: none;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+
+    .theme-toggle {
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--rule);
+      border-radius: 50%;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--rule-strong);
+      background: var(--alloy-soft);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .theme-icon {
+      width: 19px;
+      height: 19px;
+      stroke: currentColor;
+    }
+
+    .theme-icon-sun {
+      display: none;
+    }
+
+    html[data-theme="dark"] .theme-icon-moon {
+      display: none;
+    }
+
+    html[data-theme="dark"] .theme-icon-sun {
+      display: block;
+    }
+
+    .relationship-rail {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 12px 20px;
+      margin-bottom: 16px;
+      padding: 14px 16px 15px;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .relationship-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .relationship-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .relationship-button {
+      min-height: 38px;
+      padding: 7px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .relationship-button:hover {
+      border-color: var(--rule-strong);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .relationship-button[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--google-blue) 52%, var(--rule));
+      background: var(--alloy-soft);
+      color: var(--alloy);
+    }
+
+    .relationship-button:focus-visible,
+    .theme-toggle:focus-visible,
+    .table-button:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--alloy) 45%, transparent);
+      outline-offset: 3px;
+    }
+
+    .relationship-summary {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(280px, auto) minmax(0, 1fr);
+      gap: 12px 18px;
+      align-items: baseline;
+      padding: 10px 12px;
+      border-left: 4px solid var(--google-yellow);
+      background: color-mix(in srgb, var(--google-yellow) 9%, var(--surface));
+    }
+
+    .relationship-summary code {
+      color: var(--ink);
+      font-size: 0.84rem;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .relationship-summary span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .systems {
+      display: grid;
+      grid-template-columns: 0.95fr 1.15fr;
+      gap: 16px;
+    }
+
+    .engine {
+      overflow: hidden;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .engine-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 88px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .alloydb .engine-header {
+      border-top: 4px solid var(--google-blue);
+      background: var(--alloy-soft);
+    }
+
+    .bigquery .engine-header {
+      border-top: 4px solid var(--google-green);
+      background: var(--query-soft);
+    }
+
+    .engine-kind {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    .engine-name {
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.2;
+    }
+
+    .engine-purpose {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .table-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .table-list li + li {
+      border-top: 1px solid var(--rule);
+    }
+
+    .table-button {
+      display: grid;
+      grid-template-columns: 40% minmax(0, 1fr) 84px;
+      align-items: center;
+      width: 100%;
+      min-height: 66px;
+      gap: 16px;
+      padding: 12px 20px;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 150ms ease, opacity 150ms ease;
+    }
+
+    .table-button:hover {
+      background: color-mix(in srgb, var(--rule) 28%, transparent);
+    }
+
+    .table-button[aria-pressed="true"] {
+      background: var(--surface-raised);
+      box-shadow: inset 4px 0 0 var(--engine-accent);
+    }
+
+    .table-button.is-related {
+      background: color-mix(in srgb, var(--engine-accent) 10%, transparent);
+    }
+
+    .table-button.is-related[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--engine-accent) 15%, var(--surface));
+    }
+
+    .table-button.is-dimmed {
+      opacity: 0.3;
+    }
+
+    .alloydb {
+      --engine-accent: var(--alloy);
+    }
+
+    .bigquery {
+      --engine-accent: var(--query);
+    }
+
+    .table-name {
+      color: var(--engine-accent);
+      font-size: clamp(0.78rem, 1.3vw, 0.9rem);
+      font-weight: 650;
+      letter-spacing: -0.025em;
+      white-space: nowrap;
+    }
+
+    .table-grain {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    .row-count {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .detail-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+      gap: 24px;
+      margin-top: 16px;
+      padding: 22px 24px;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .detail-panel h2 {
+      margin: 0;
+      min-width: 0;
+      font-size: clamp(1.2rem, 2vw, 1.45rem);
+      letter-spacing: -0.025em;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-description {
+      max-width: 650px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .detail-facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 0;
+    }
+
+    .detail-facts div:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .detail-facts dt {
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 650;
+    }
+
+    .detail-facts dd {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 980px) {
+      .page-shell {
+        width: min(100% - 28px, 720px);
+        padding-top: 32px;
+      }
+
+      .intro {
+        margin-bottom: 22px;
+      }
+
+      .systems {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .lede {
+        white-space: normal;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page-shell {
+        width: min(100% - 20px, 480px);
+        padding: 24px 0 36px;
+      }
+
+      .relationship-rail {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .title-row {
+        align-items: flex-start;
+      }
+
+      .relationship-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .relationship-button {
+        min-height: 44px;
+      }
+
+      .relationship-summary {
+        grid-column: 1;
+        grid-template-columns: 1fr;
+        gap: 5px;
+      }
+
+      .engine-header {
+        align-items: flex-start;
+        min-height: auto;
+        padding: 16px;
+      }
+
+      .engine-purpose {
+        max-width: 126px;
+        white-space: normal;
+      }
+
+      .table-button {
+        grid-template-columns: 1fr auto;
+        gap: 3px 12px;
+        min-height: 72px;
+        padding: 12px 16px;
+      }
+
+      .table-grain {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      .row-count {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .detail-panel {
+        padding: 18px;
+      }
+
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="intro">
+      <div class="title-row">
+        <h1>Charlie's Coffee data landscape</h1>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20.3 15.2A8.5 8.5 0 0 1 8.8 3.7 8.5 8.5 0 1 0 20.3 15.2Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.5" stroke-width="1.8"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <p class="lede">Live operations sit in AlloyDB. Historical performance, market demand, locations, and reviews sit in BigQuery.</p>
+    </header>
+
+    <section class="relationship-rail" aria-labelledby="relationship-heading">
+      <h2 class="relationship-label" id="relationship-heading">Show a relationship</h2>
+      <div class="relationship-controls">
+        <button class="relationship-button" type="button" data-relationship="store_sales" aria-pressed="true">Store sales</button>
+        <button class="relationship-button" type="button" data-relationship="product_sales" aria-pressed="false">Product sales</button>
+        <button class="relationship-button" type="button" data-relationship="inventory_sales" aria-pressed="false">Inventory vs. sales</button>
+        <button class="relationship-button" type="button" data-relationship="zip_context" aria-pressed="false">ZIP context</button>
+        <button class="relationship-button" type="button" data-relationship="store_reviews" aria-pressed="false">Store reviews</button>
+      </div>
+      <div class="relationship-summary" aria-live="polite">
+        <code data-relationship-expression>stores.store_id = historical_sales.store_id</code>
+        <span data-relationship-note>One store maps to many weekly sales rows.</span>
+      </div>
+    </section>
+
+    <div class="systems">
+      <section class="engine alloydb" aria-labelledby="alloydb-heading">
+        <header class="engine-header">
+          <div>
+            <h2 class="engine-name" id="alloydb-heading">AlloyDB</h2>
+            <span class="engine-kind">Operational data</span>
+          </div>
+          <p class="engine-purpose">What is happening now</p>
+        </header>
+        <ul class="table-list">
+          <li><button class="table-button" type="button" data-table="stores" data-keys="store_id zip_code" aria-pressed="false"><code class="table-name">stores</code><span class="table-grain">one physical store</span><span class="row-count">6 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="products" data-keys="sku" aria-pressed="false"><code class="table-name">products</code><span class="table-grain">one product</span><span class="row-count">25 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="inventory" data-keys="store_id sku" aria-pressed="false"><code class="table-name">inventory</code><span class="table-grain">current stock by store and product</span><span class="row-count">150 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="stock_movements" data-keys="store_id sku" aria-pressed="false"><code class="table-name">stock_movements</code><span class="table-grain">one inventory event</span><span class="row-count">10.1k rows</span></button></li>
+        </ul>
+      </section>
+
+      <section class="engine bigquery" aria-labelledby="bigquery-heading">
+        <header class="engine-header">
+          <div>
+            <h2 class="engine-name" id="bigquery-heading">BigQuery</h2>
+            <span class="engine-kind">Analytical data</span>
+          </div>
+          <p class="engine-purpose">History and growth</p>
+        </header>
+        <ul class="table-list">
+          <li><button class="table-button" type="button" data-table="historical_sales" data-keys="store_id sku zip_code" aria-pressed="false"><code class="table-name">historical_sales</code><span class="table-grain">weekly sales by store and product</span><span class="row-count">15.6k rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="market_demand" data-keys="zip_code" aria-pressed="true"><code class="table-name">market_demand</code><span class="table-grain">weekly coffee demand by ZIP</span><span class="row-count">1,560 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="demographics_and_traffic" data-keys="zip_code" aria-pressed="false"><code class="table-name">demographics_and_traffic</code><span class="table-grain">population and foot traffic by ZIP</span><span class="row-count">15 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="candidate_sites" data-keys="zip_code" aria-pressed="false"><code class="table-name">candidate_sites</code><span class="table-grain">one prospective property</span><span class="row-count">12 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="customer_feedback" data-keys="store_id zip_code" aria-pressed="false"><code class="table-name">customer_feedback</code><span class="table-grain">one store or competitor review</span><span class="row-count">300 rows</span></button></li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="detail-panel" aria-live="polite" aria-labelledby="detail-title">
+      <div>
+        <h2 id="detail-title"><code data-detail-name>market_demand</code></h2>
+        <p class="detail-description" data-detail-description>Weekly coffee-category demand for every ZIP in the scenario, including ZIPs where Charlie's does not yet operate.</p>
+      </div>
+      <dl class="detail-facts">
+        <div>
+          <dt>Grain</dt>
+          <dd data-detail-grain>one ZIP × ISO week</dd>
+        </div>
+        <div>
+          <dt>Join with</dt>
+          <dd data-detail-keys><code>zip_code</code></dd>
+        </div>
+        <div>
+          <dt>Useful for</dt>
+          <dd data-detail-use>Forecasting market demand and deriving Charlie's capture rate.</dd>
+        </div>
+      </dl>
+    </section>
+
+  </main>
+
+  <script>
+    const tableDetails = {
+      stores: {
+        engine: "AlloyDB",
+        description: "The six operating Charlie's Coffee locations and the ZIP each store belongs to.",
+        grain: "one physical store",
+        keys: ["store_id", "zip_code"],
+        use: "Locating stores and connecting operational records to sales and reviews."
+      },
+      products: {
+        engine: "AlloyDB",
+        description: "The current product catalog, including category, list price, and reorder threshold.",
+        grain: "one SKU",
+        keys: ["sku"],
+        use: "Understanding the items carried and deciding when stock needs attention."
+      },
+      inventory: {
+        engine: "AlloyDB",
+        description: "The latest stock count for every product carried by every store.",
+        grain: "one store × SKU",
+        keys: ["store_id", "sku"],
+        use: "Finding shortages and checking whether a store can fulfill an order now."
+      },
+      stock_movements: {
+        engine: "AlloyDB",
+        description: "The inventory ledger: sales, deliveries, waste, and adjustments over time.",
+        grain: "one inventory event",
+        keys: ["store_id", "sku"],
+        use: "Explaining how current stock levels developed."
+      },
+      historical_sales: {
+        engine: "BigQuery",
+        description: "Two years of Charlie's weekly unit sales and net revenue by store and product.",
+        grain: "one store × SKU × ISO week",
+        keys: ["store_id", "sku", "zip_code"],
+        use: "Comparing store performance and estimating Charlie's share of market demand."
+      },
+      market_demand: {
+        engine: "BigQuery",
+        description: "Weekly coffee-category demand for every ZIP in the scenario, including ZIPs where Charlie's does not yet operate.",
+        grain: "one ZIP × ISO week",
+        keys: ["zip_code"],
+        use: "Forecasting market demand and deriving Charlie's capture rate."
+      },
+      demographics_and_traffic: {
+        engine: "BigQuery",
+        description: "Synthetic population, household, income, age, and pedestrian-activity measures for each ZIP.",
+        grain: "one ZIP",
+        keys: ["zip_code"],
+        use: "Explaining what separates stronger store markets from weaker ones."
+      },
+      candidate_sites: {
+        engine: "BigQuery",
+        description: "Twelve fictional commercial properties available for Charlie's seventh store.",
+        grain: "one prospective property",
+        keys: ["zip_code"],
+        use: "Comparing space, rent, and location after identifying promising ZIPs."
+      },
+      customer_feedback: {
+        engine: "BigQuery",
+        description: "Recent synthetic reviews covering Charlie's stores and nearby competitors.",
+        grain: "one review",
+        keys: ["business_id → store_id", "zip_code"],
+        use: "Testing whether customer sentiment corroborates operational and market evidence."
+      }
+    };
+
+    const tableButtons = [...document.querySelectorAll("[data-table]")];
+    const relationshipButtons = [...document.querySelectorAll("[data-relationship]")];
+    const themeToggle = document.querySelector("[data-theme-toggle]");
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    const detailName = document.querySelector("[data-detail-name]");
+    const detailDescription = document.querySelector("[data-detail-description]");
+    const detailGrain = document.querySelector("[data-detail-grain]");
+    const detailKeys = document.querySelector("[data-detail-keys]");
+    const detailUse = document.querySelector("[data-detail-use]");
+    const relationshipExpression = document.querySelector("[data-relationship-expression]");
+    const relationshipNote = document.querySelector("[data-relationship-note]");
+
+    const relationships = {
+      store_sales: {
+        tables: ["stores", "historical_sales"],
+        expression: "stores.store_id = historical_sales.store_id",
+        note: "One store maps to many weekly sales rows."
+      },
+      product_sales: {
+        tables: ["products", "historical_sales"],
+        expression: "products.sku = historical_sales.sku",
+        note: "One product maps to many store-week sales rows."
+      },
+      inventory_sales: {
+        tables: ["inventory", "historical_sales"],
+        expression: "inventory.(store_id, sku) = historical_sales.(store_id, sku)",
+        note: "Inventory is current and sales is weekly history. Filter or aggregate sales before comparing."
+      },
+      zip_context: {
+        tables: ["demographics_and_traffic", "market_demand", "candidate_sites"],
+        expression: "market_demand.zip_code = demographics_and_traffic.zip_code = candidate_sites.zip_code",
+        note: "Demand is weekly and more than one site can share a ZIP. Account for grain before aggregating."
+      },
+      store_reviews: {
+        tables: ["stores", "customer_feedback"],
+        expression: "stores.store_id = customer_feedback.business_id",
+        note: "Valid only for customer_feedback rows where business_type = 'own_store'."
+      }
+    };
+
+    function applyTheme(theme, persist = true) {
+      document.documentElement.dataset.theme = theme;
+      themeColor.content = theme === "dark" ? "#111315" : "#f8fafd";
+      const nextTheme = theme === "dark" ? "light" : "dark";
+      const label = `Switch to ${nextTheme} mode`;
+      themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
+      themeToggle.setAttribute("aria-label", label);
+      themeToggle.title = label;
+      if (persist) {
+        try {
+          localStorage.setItem("data-landscape-theme", theme);
+        } catch {}
+      }
+    }
+
+    function renderKeys(keys) {
+      detailKeys.replaceChildren();
+      keys.forEach((key, index) => {
+        if (index > 0) {
+          detailKeys.append(document.createTextNode(", "));
+        }
+        const code = document.createElement("code");
+        code.textContent = key;
+        detailKeys.append(code);
+      });
+    }
+
+    function selectTable(tableName) {
+      const details = tableDetails[tableName];
+      tableButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.table === tableName));
+      });
+      detailName.textContent = tableName;
+      detailDescription.textContent = details.description;
+      detailGrain.textContent = details.grain;
+      renderKeys(details.keys);
+      detailUse.textContent = details.use;
+    }
+
+    function selectRelationship(name) {
+      const relationship = relationships[name];
+      relationshipButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.relationship === name));
+      });
+      tableButtons.forEach((button) => {
+        const matches = relationship.tables.includes(button.dataset.table);
+        button.classList.toggle("is-related", matches);
+        button.classList.toggle("is-dimmed", !matches);
+      });
+      relationshipExpression.textContent = relationship.expression;
+      relationshipNote.textContent = relationship.note;
+    }
+
+    tableButtons.forEach((button) => {
+      button.addEventListener("click", () => selectTable(button.dataset.table));
+    });
+
+    relationshipButtons.forEach((button) => {
+      button.addEventListener("click", () => selectRelationship(button.dataset.relationship));
+    });
+
+    themeToggle.addEventListener("click", () => {
+      applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    });
+
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
+    selectTable("stores");
+    selectRelationship("store_sales");
+  </script>
+</body>
+</html>

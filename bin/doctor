@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/workshop-common.sh
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+
+GCP_PROJECT_ID="$(workshop_saved_project)"
+workshop_source_env_local
+
+failures=0
+warnings=0
+
+# A check report, not a procedure, so these use their own labels rather than
+# the shared workshop_info/ok/warn/error family. All three stay on stdout: the
+# report is one ordered stream an attendee can copy in full.
+pass() { workshop_print_status "$WORKSHOP_SGR_GREEN" 'PASS' 1 "$1"; }
+fail() { workshop_print_status "$WORKSHOP_SGR_RED" 'FAIL' 1 "$1"; failures=$((failures + 1)); }
+warn() { workshop_print_status "$WORKSHOP_SGR_YELLOW" 'WARN' 1 "$1"; warnings=$((warnings + 1)); }
+
+check_command() {
+  if command -v "$1" >/dev/null 2>&1; then
+    pass "$1 is installed"
+  else
+    fail "$1 is not installed"
+  fi
+}
+
+check_command gcloud
+check_command node
+check_command npm
+
+has_codex=false
+has_claude=false
+if command -v codex >/dev/null 2>&1; then
+  has_codex=true
+  pass "codex is installed"
+fi
+if command -v claude >/dev/null 2>&1; then
+  has_claude=true
+  pass "claude is installed"
+fi
+if [[ "$has_codex" == false && "$has_claude" == false ]]; then
+  fail "no supported coding agent is installed (codex or claude)"
+fi
+
+if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
+  pass "workshop project is configured ($GCP_PROJECT_ID)"
+  workshop_export_project_env "$GCP_PROJECT_ID"
+else
+  unset GCP_PROJECT_ID
+  fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID"
+fi
+
+if command -v gcloud >/dev/null 2>&1 && [[ -n "${GCP_PROJECT_ID:-}" ]]; then
+  active_account="$(gcloud auth list --project="$GCP_PROJECT_ID" --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1)"
+  if [[ -n "$active_account" ]]; then
+    pass "gcloud has an active account ($active_account)"
+  else
+    fail "gcloud has no active account; run: gcloud auth login"
+  fi
+
+  if gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+    pass "Application Default Credentials are available"
+  else
+    fail "ADC is unavailable; run: gcloud auth application-default login"
+  fi
+fi
+
+check_secret_source() {
+  local variable_name="$1"
+  local secret_id="$2"
+
+  if [[ -n "${!variable_name:-}" ]]; then
+    pass "$variable_name is available from the environment"
+    return
+  fi
+
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    fail "$variable_name is unset and no workshop project is configured"
+    return
+  fi
+
+  if ! command -v gcloud >/dev/null 2>&1; then
+    fail "$variable_name is unset and gcloud is unavailable"
+    return
+  fi
+
+  if gcloud secrets versions access "$SECRET_VERSION" \
+    --secret="$secret_id" \
+    --project="$GCP_PROJECT_ID" \
+    >/dev/null 2>&1; then
+    pass "$variable_name can be loaded from Secret Manager"
+  else
+    fail "Cannot access Secret Manager secret $secret_id in $GCP_PROJECT_ID"
+  fi
+}
+
+check_secret_source WORKSHOP_DK_API_KEY "$DK_SECRET_ID"
+check_secret_source WORKSHOP_MAPS_API_KEY "$MAPS_SECRET_ID"
+
+# Use only the CLI's status command and its exit code. Discard both output
+# streams: status can include account details or an API-key preview. Do not
+# inspect credential files or start an interactive login from doctor.
+check_agent_login() {
+  local label="$1" login_command="$2"
+  shift 2
+  if "$@" </dev/null >/dev/null 2>&1; then
+    pass "$label: CLI reports a configured login"
+    return 0
+  fi
+  warn "$label: CLI login could not be confirmed; plugin/MCP checks skipped"
+  echo "      Sign in with '$login_command' if needed, then rerun ./bin/doctor."
+  echo "      If already signed in, check the CLI's login status and version."
+  return 1
+}
+
+if [[ "$has_codex" == true ]] && check_agent_login Codex 'codex login' codex login status; then
+  if ! plugin_entry="$(workshop_agent_entry codex plugin)"; then
+    fail "Codex: could not read the installed plugin list"
+  elif [[ "$plugin_entry" != null ]]; then
+    pass "Codex: Data Agent Kit plugin is installed"
+  else
+    fail "Codex: Data Agent Kit plugin is not installed; run: ./bin/setup"
+  fi
+
+  mcp_json="$(cd "$repo_root" && codex mcp list --json 2>/dev/null)"
+  for server in google_developer_knowledge maps_grounding_lite cloud_run; do
+    if grep -Fq "$server" <<<"$mcp_json"; then
+      pass "Codex: $server MCP configuration is visible"
+    else
+      warn "Codex: $server MCP is not visible; trust the project and restart Codex"
+    fi
+  done
+
+  if codex_proxy="$(workshop_dak_proxy_path codex)"; then
+    pass "Codex: Data Agent Kit MCP proxy found ($codex_proxy)"
+  else
+    fail "Codex: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
+  fi
+fi
+
+if [[ "$has_claude" == true ]] && check_agent_login 'Claude Code' 'claude auth login' claude auth status; then
+  # Check what is actually installed rather than what setup declared, so a
+  # failed or partial install cannot report as healthy.
+  claude_marketplace_ref="$(
+    workshop_agent_entry claude marketplace | node -e '
+      const entry = JSON.parse(require("fs").readFileSync(0, "utf8"));
+      if (!entry) { console.log("__MISSING__"); }
+      else { console.log(entry.ref || "__DEFAULT_BRANCH__"); }
+    ' 2>/dev/null
+  )"
+
+  if [[ "$claude_marketplace_ref" == "__MISSING__" || -z "$claude_marketplace_ref" ]]; then
+    fail "Claude Code: marketplace $DAK_MARKETPLACE is not configured; run: ./bin/setup PROJECT_ID"
+  elif [[ -z "${DAK_REF:-}" ]]; then
+    if [[ "$claude_marketplace_ref" == "__DEFAULT_BRANCH__" ]]; then
+      pass "Claude Code: marketplace tracks the default branch"
+    else
+      fail "Claude Code: marketplace is pinned to ref $claude_marketplace_ref, but config/workshop.env pins no ref"
+    fi
+  elif [[ "$claude_marketplace_ref" == "$DAK_REF" ]]; then
+    pass "Claude Code: marketplace is pinned to ref $DAK_REF"
+  else
+    fail "Claude Code: marketplace ref is $claude_marketplace_ref; config/workshop.env expects $DAK_REF"
+  fi
+
+  claude_plugin_report="$(
+    workshop_agent_entry claude plugin | dak_plugin="$DAK_PLUGIN" node -e '
+      const fs = require("fs");
+      const entry = JSON.parse(fs.readFileSync(0, "utf8"));
+      const plugin = process.env.dak_plugin;
+      if (!entry) {
+        console.log("FAIL plugin " + plugin + " is not installed; run: ./bin/setup PROJECT_ID");
+      } else {
+        if (entry.enabled) {
+          console.log("PASS plugin " + plugin + " is installed and enabled (scope: " + entry.scope + ")");
+        } else {
+          console.log("FAIL plugin " + plugin + " is installed but disabled");
+        }
+        if (entry.installPath && !fs.existsSync(entry.installPath)) {
+          console.log("FAIL plugin files are missing from " + entry.installPath);
+        }
+        const servers = Object.keys(entry.mcpServers || {});
+        if (servers.length > 0) {
+          console.log("PASS plugin provides " + servers.length + " MCP server(s)");
+        } else {
+          console.log("WARN plugin declares no MCP servers");
+        }
+      }
+    ' 2>/dev/null
+  )"
+
+  if [[ -z "$claude_plugin_report" ]]; then
+    fail "Claude Code: could not read the installed plugin list"
+  else
+    while IFS= read -r line; do
+      case "$line" in
+        PASS\ *) pass "Claude Code: ${line#PASS }" ;;
+        WARN\ *) warn "Claude Code: ${line#WARN }" ;;
+        *) fail "Claude Code: ${line#FAIL }" ;;
+      esac
+    done <<<"$claude_plugin_report"
+  fi
+
+  # claude plugin install --config stores the plugin options in the user
+  # settings file, so verify them there rather than in the repository.
+  #
+  # GCP_REGION is the only option the plugin declares since DAK 0.10.1, and it
+  # is worth checking: it fills the region placeholder in the Dataproc MCP URL,
+  # and an unfilled placeholder makes that server register zero tools with no
+  # error message at all.
+  claude_user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+  claude_plugin_region="$(
+    claude_user_settings="$claude_user_settings" \
+    dak_plugin="$DAK_PLUGIN" \
+    node -e '
+      const fs = require("fs");
+      let settings = {};
+      try { settings = JSON.parse(fs.readFileSync(process.env.claude_user_settings, "utf8")); } catch (error) {}
+      const entry = (settings.pluginConfigs || {})[process.env.dak_plugin] || {};
+      console.log((entry.options || {}).GCP_REGION || "");
+    ' 2>/dev/null
+  )"
+  if [[ "$claude_plugin_region" == "$DAK_GCP_REGION" ]]; then
+    pass "Claude Code: plugin GCP_REGION matches config/workshop.env ($DAK_GCP_REGION)"
+  else
+    fail "Claude Code: plugin GCP_REGION is \"$claude_plugin_region\"; expected $DAK_GCP_REGION"
+  fi
+
+  claude_mcp="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
+  for server in google_developer_knowledge maps_grounding_lite cloud_run; do
+    if grep -Fq "$server" <<<"$claude_mcp"; then
+      pass "Claude Code: $server MCP configuration is visible"
+    else
+      warn "Claude Code: $server MCP is not visible; trust the project and restart Claude Code"
+    fi
+  done
+
+  if claude_proxy="$(workshop_dak_proxy_path claude)"; then
+    pass "Claude Code: Data Agent Kit MCP proxy found ($claude_proxy)"
+  else
+    fail "Claude Code: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
+  fi
+fi
+
+# Cloud Run is the one MCP server here that answers tools/list without any
+# credential at all. A server that is merely "visible" therefore proves nothing:
+# an attendee with broken credentials still sees five tools listed and only
+# discovers the problem when a tool call fails mid-exercise. Call a read-only
+# tool for real and require a real result.
+check_cloud_run_mcp() {
+  local token request response verdict
+
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    fail "Cloud Run MCP: no workshop project is configured"
+    return
+  fi
+
+  for required in curl gcloud node; do
+    if ! command -v "$required" >/dev/null 2>&1; then
+      warn "Cloud Run MCP: cannot verify without $required"
+      return
+    fi
+  done
+
+  if ! token="$(gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" 2>/dev/null)" ||
+    [[ -z "$token" ]]; then
+    fail "Cloud Run MCP: no ADC access token; run: gcloud auth application-default login"
+    return
+  fi
+
+  printf -v request \
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_services","arguments":{"project":"%s","region":"%s"}}}' \
+    "$GCP_PROJECT_ID" "$CLOUD_RUN_REGION"
+
+  # The access token is written to curl's stdin config, never passed as an
+  # argument, so it cannot appear in a process listing.
+  if ! response="$(
+    printf 'header = "Authorization: Bearer %s"\n' "$token" |
+      curl --fail --silent --max-time 30 --config - \
+        --header 'Content-Type: application/json' \
+        --request POST "$CLOUD_RUN_MCP_URL" \
+        --data "$request" 2>/dev/null
+  )"; then
+    unset token
+    fail "Cloud Run MCP: request failed; check connectivity and project IAM permissions"
+    return
+  fi
+  unset token
+
+  if [[ -z "$response" ]]; then
+    fail "Cloud Run MCP: no response from $CLOUD_RUN_MCP_URL"
+    return
+  fi
+
+  verdict="$(
+    node -e '
+      let doc = {};
+      try { doc = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch (error) {
+        console.log("FAIL the server returned a non-JSON response");
+        process.exit(0);
+      }
+      const result = doc && doc.result;
+      if (doc && doc.error) {
+        console.log("FAIL " + (doc.error.message || "the server returned an error"));
+        process.exit(0);
+      }
+      if (!doc || doc.jsonrpc !== "2.0" || doc.id !== 1 ||
+          !result || !Array.isArray(result.content)) {
+        console.log("FAIL the server returned an error or an invalid tool response");
+        process.exit(0);
+      }
+      const text = result.content
+        .map((part) => (part && part.text) || "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (result.isError) {
+        console.log("FAIL " + (text || "the tool call was rejected"));
+      } else if (!text && !result.structuredContent) {
+        console.log("FAIL the tool returned no result content");
+      } else {
+        console.log("PASS list_services answered for this project");
+      }
+    ' <<<"$response" 2>/dev/null
+  )"
+
+  case "$verdict" in
+    PASS\ *) pass "Cloud Run MCP: ${verdict#PASS }" ;;
+    FAIL\ *) fail "Cloud Run MCP: ${verdict#FAIL }" ;;
+    *) fail "Cloud Run MCP: could not interpret the server response" ;;
+  esac
+}
+
+check_cloud_run_mcp
+
+echo
+printf -v summary 'Doctor finished with %d failure(s) and %d warning(s).' "$failures" "$warnings"
+if (( failures > 0 )); then
+  workshop_print_line "$WORKSHOP_SGR_RED" 1 "$summary"
+elif (( warnings > 0 )); then
+  workshop_print_line "$WORKSHOP_SGR_YELLOW" 1 "$summary"
+else
+  workshop_print_line "$WORKSHOP_SGR_GREEN" 1 "$summary"
+fi
+(( failures == 0 ))
