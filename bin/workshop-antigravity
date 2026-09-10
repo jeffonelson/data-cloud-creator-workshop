@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+agy_path="$(workshop_agy_path)"
+[[ -n "$agy_path" ]] || { workshop_error 'Antigravity CLI is missing. Install agy, then retry.'; exit 1; }
+project_id="$(workshop_saved_project)"
+workshop_project_id_is_valid "$project_id" || { workshop_error 'Run ./bin/setup PROJECT_ID first.'; exit 1; }
+workshop_antigravity_config check
+workshop_export_project_env "$project_id"
+cd "$repo_root"
+exec "$agy_path" "$@"

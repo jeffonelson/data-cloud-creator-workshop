@@ -297,3 +297,6 @@ workshop_prepare_launch() {
 
   WORKSHOP_PROJECT_ID="$project_id"
 }
+
+# shellcheck source=antigravity.sh
+source "$repo_root/bin/lib/antigravity.sh"

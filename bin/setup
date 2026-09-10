@@ -44,9 +44,11 @@ require_command node
 require_command npm
 
 # Configure whichever supported coding agents are installed. At least one is
-# required; both are configured when both are present.
+# required; every installed supported agent is configured.
 has_codex=false
 has_claude=false
+has_antigravity=false
+if workshop_has_antigravity; then has_antigravity=true; fi
 if command -v codex >/dev/null 2>&1; then
   has_codex=true
 fi
@@ -54,8 +56,8 @@ if command -v claude >/dev/null 2>&1; then
   has_claude=true
 fi
 
-if [[ "$has_codex" == false && "$has_claude" == false ]]; then
-  workshop_error "No supported coding agent found. Install the Codex CLI, the Claude Code CLI, or both."
+if [[ "$has_codex" == false && "$has_claude" == false && "$has_antigravity" == false ]]; then
+  workshop_error "No supported coding agent found. Install Codex, Claude Code, or Antigravity (desktop or CLI)."
   exit 1
 fi
 
@@ -162,6 +164,10 @@ if [[ "$has_claude" == true ]]; then
 fi
 
 echo
+if [[ "$has_antigravity" == true ]]; then
+  workshop_info "Configuring Antigravity desktop and CLI..."
+  workshop_setup_antigravity
+fi
 workshop_print_line "$WORKSHOP_SGR_GREEN$WORKSHOP_SGR_BOLD" 1 "Setup complete for project: $GCP_PROJECT_ID"
 if [[ "$has_codex" == true ]]; then
   echo "Launch Codex with:        ./bin/workshop-codex"
@@ -170,3 +176,7 @@ if [[ "$has_claude" == true ]]; then
   echo "Launch Claude Code with:  ./bin/workshop-claude"
 fi
 echo "On first launch, trust this repository so the project-scoped MCP configuration loads."
+if [[ "$has_antigravity" == true ]]; then
+  echo "Launch Antigravity CLI:   ./bin/workshop-antigravity"
+  echo "Or open this folder in Antigravity desktop and refresh MCP servers."
+fi

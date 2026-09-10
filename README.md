@@ -7,7 +7,7 @@ You need:
 
 - Your assigned Google Cloud project ID
 - Google Cloud CLI and Node.js
-- Codex CLI, Claude Code CLI, or both
+- Codex CLI, Claude Code CLI, or Antigravity CLI (`agy`)
 
 ## Set up
 
@@ -37,7 +37,7 @@ and configures the Data Agent Kit plugin for each supported agent on your comput
 ./bin/setup <INSERT_YOUR_GOOGLE_CLOUD_PROJECT_ID>
 ```
 
-Before running doctor, sign in to your chosen CLI if needed: `codex login` or `claude auth login`.
+Before running doctor, sign in to your chosen CLI if needed: `codex login`, `claude auth login`, or `agy`.
 
 `./bin/doctor` runs read-only checks for the required software, agent CLI login,
 Google Cloud authentication, plugin installation, and MCP configuration.
@@ -48,7 +48,7 @@ Google Cloud authentication, plugin installation, and MCP configuration.
 
 ### 3. Launch one agent
 
-Use a workshop launcher instead of running `codex` or `claude` directly so it
+Use a workshop launcher instead of running `codex`, `claude`, or `agy` directly so it
 can load the workshop credentials and project settings before starting the agent.
 
 ```bash
@@ -57,6 +57,10 @@ can load the workshop credentials and project settings before starting the agent
 
 ```bash
 ./bin/workshop-claude
+```
+
+```bash
+./bin/workshop-antigravity
 ```
 
 Trust the repository when prompted. Keep this session open for the entire lab.

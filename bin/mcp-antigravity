@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Global MCP entries use an absolute path to this file. Resolve the selected
+# project at server startup, including when launched from the desktop app.
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/bin/lib/workshop-common.sh"
+workshop_load_config
+[[ $# == 1 ]] || { echo 'Expected one MCP server name.' >&2; exit 2; }
+project_id="$(workshop_saved_project)"
+workshop_project_id_is_valid "$project_id" || { echo 'Run ./bin/setup PROJECT_ID before starting Antigravity MCP servers.' >&2; exit 1; }
+workshop_export_project_env "$project_id"
+export WORKSHOP_DAK_PROXY="$repo_root/.workshop-state/antigravity-source/$DAK_PROXY_RELATIVE_PATH"
+[[ -f "$WORKSHOP_DAK_PROXY" ]] || { echo 'Antigravity DAK source is missing; run ./bin/setup.' >&2; exit 1; }
+# Read only the needed key. Values stay in this MCP process and its child.
+case "$1" in
+  google_developer_knowledge)
+    workshop_load_secret_if_unset WORKSHOP_DK_API_KEY "$DK_SECRET_ID" "$project_id"
+    ;;
+  maps_grounding_lite)
+    workshop_load_secret_if_unset WORKSHOP_MAPS_API_KEY "$MAPS_SECRET_ID" "$project_id"
+    ;;
+  cloud_run) exec "$repo_root/bin/mcp-dak-proxy" "$CLOUD_RUN_MCP_URL" ;;
+  *) echo "Unknown workshop MCP server." >&2; exit 2 ;;
+esac
+exec node "$repo_root/scripts/mcp-api-key.cjs" "$1"

@@ -33,6 +33,8 @@ check_command npm
 
 has_codex=false
 has_claude=false
+has_antigravity=false
+if workshop_has_antigravity; then has_antigravity=true; fi
 if command -v codex >/dev/null 2>&1; then
   has_codex=true
   pass "codex is installed"
@@ -41,8 +43,8 @@ if command -v claude >/dev/null 2>&1; then
   has_claude=true
   pass "claude is installed"
 fi
-if [[ "$has_codex" == false && "$has_claude" == false ]]; then
-  fail "no supported coding agent is installed (codex or claude)"
+if [[ "$has_codex" == false && "$has_claude" == false && "$has_antigravity" == false ]]; then
+  fail "no supported coding agent is installed (Codex, Claude Code, or Antigravity)"
 fi
 
 if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
@@ -333,6 +335,21 @@ check_cloud_run_mcp() {
     *) fail "Cloud Run MCP: could not interpret the server response" ;;
   esac
 }
+
+if [[ "$has_antigravity" == true ]]; then
+  if workshop_antigravity_config check; then
+    pass "Antigravity: configuration and skills are ready"
+  else
+    fail "Antigravity: setup is incomplete; run ./bin/setup PROJECT_ID"
+  fi
+  if [[ -f "$repo_root/.workshop-state/antigravity-source/.workshop-ref" ]] &&
+     [[ "$(cat "$repo_root/.workshop-state/antigravity-source/.workshop-ref")" == "${DAK_REF:-HEAD}" ]]; then
+    pass "Antigravity: source ref matches config/workshop.env"
+  else
+    fail "Antigravity: source ref is missing or differs from config/workshop.env"
+  fi
+  warn "Antigravity: verify sign-in and live tools inside the app; CLI has no login-status command"
+fi
 
 check_cloud_run_mcp
 

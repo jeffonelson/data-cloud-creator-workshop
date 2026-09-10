@@ -10,6 +10,16 @@ state_dir="$(workshop_state_dir)"
 
 removed_anything=false
 
+if [[ -f "$state_dir/antigravity-added-by-workshop.json" ]]; then
+  workshop_antigravity_config teardown
+  removed_anything=true
+fi
+if [[ -f "$state_dir/antigravity-source-added-by-workshop" ]]; then
+  rm -rf "$state_dir/antigravity-source"
+  rm -f "$state_dir/antigravity-source-added-by-workshop"
+  removed_anything=true
+fi
+
 if [[ -f "$state_dir/plugin-added-by-workshop" ]]; then
   workshop_info "Removing Codex plugin installed by this workshop checkout..."
   codex plugin remove "$DAK_PLUGIN"
