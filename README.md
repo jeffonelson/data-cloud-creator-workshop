@@ -81,7 +81,9 @@ Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PA
 
 ## Data landscape
 
-[![Preview of Charlie's Coffee data landscape](assets/data-landscape-preview.png)](data-landscape.html)
+[![Preview of Charlie's Coffee data landscape](assets/data-landscape-preview.png)](https://jeffonelson.github.io/data-cloud-creator-workshop/data-landscape.html)
+
+[Open the interactive data landscape](https://jeffonelson.github.io/data-cloud-creator-workshop/data-landscape.html).
 
 After cloning, open `data-landscape.html` in your browser to explore the tables,
 their grain, and the relationships between them. On a Mac, run:
