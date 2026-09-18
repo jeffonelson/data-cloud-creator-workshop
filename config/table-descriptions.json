@@ -1,0 +1,8 @@
+{
+  "demographics_and_traffic": "ZIP dimension. Grain: one row per San Francisco ZIP code, 15 rows. Real ZIP geography, synthetic demographics and modelled pedestrian activity. Slowly changing, but no history is kept: every value is current as of the scenario anchor date.",
+  "historical_sales": "Periodic snapshot fact. Grain: one row per store, SKU and ISO week (Monday-start), 104 weeks. This brand's own sales only. units_sold reconciles exactly to SALE rows in the AlloyDB stock_movements ledger for any complete week.",
+  "market_demand": "Periodic snapshot fact. Grain: one row per ZIP code and ISO week. Whole-market coffee spend across ALL businesses in the ZIP, not this brand's sales. Exists so the 9 candidate ZIPs without a store still have a series to forecast.",
+  "candidate_sites": "Prospective location dimension. Grain: one row per commercial property under consideration. A candidate site has no sales, inventory or feedback of its own; ZIP is the only join path to evidence.",
+  "feedback_seed": "Scaffolding for customer_feedback, not an attendee-facing table. Grain: one row per review. Carries the tone and topic that AI.GENERATE turns into review_text at provision time.",
+  "customer_feedback": "Review fact. Grain: one row per customer review, covering this brand's stores and named competitors. Filter on business_type before drawing conclusions about the brand. Join to stores on business_id, never on business_name. All reviews are synthetic, including named competitors; they are not actual customer testimony. review_text is written by AI.GENERATE at provision time, so wording differs between projects."
+}

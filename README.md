@@ -5,7 +5,7 @@ a coffee shop expansion scenario.
 
 You need:
 
-- Your assigned Google Cloud project ID
+- A prepared workshop project ID, or your own Google Cloud project with billing enabled
 - Google Cloud CLI and Node.js
 - Codex CLI, Claude Code CLI, or Antigravity CLI (`agy`)
 
@@ -25,12 +25,31 @@ git clone https://github.com/jeffonelson/data-cloud-creator-workshop.git
 cd data-cloud-creator-workshop
 ```
 
-### 2. Configure and verify
+### 2. Provision your own project (skip if yours is already prepared)
 
-Replace the placeholder below, including the angle brackets, with your assigned
+Use a project you own with billing enabled, preferably a fresh project dedicated
+to this demo. Install Python 3 and the Google Cloud CLI including `bq`, then run:
+
+```bash
+./bin/provision YOUR_PROJECT_ID
+```
+
+Allow about 15–20 minutes. This creates AlloyDB, BigQuery demo data and
+connections, a staging bucket, dedicated networking, and the keys/secrets needed
+by the agents. It uses your signed-in account and leaves your global gcloud
+project setting unchanged. Organization policies or quotas may require an admin.
+
+Retries preserve completed data loads and credentials. To deliberately replace
+the demo tables and regenerate reviews, use `./bin/provision YOUR_PROJECT_ID --reset-data`.
+Conflicting resources are never adopted. AlloyDB incurs ongoing charges; delete
+your dedicated demo project when finished. `./bin/teardown` only removes local setup.
+
+### 3. Configure and verify
+
+Replace the placeholder below, including the angle brackets, with your
 Google Cloud project ID.
 
-`./bin/setup` checks access to your assigned project and secrets, then installs
+`./bin/setup` checks access to your project and secrets, then installs
 and configures the Data Agent Kit plugin for each supported agent on your computer.
 
 ```bash
@@ -46,7 +65,7 @@ Google Cloud authentication, plugin installation, and MCP configuration.
 ./bin/doctor
 ```
 
-### 3. Launch one agent
+### 4. Launch one agent
 
 Use a workshop launcher instead of running `codex`, `claude`, or `agy` directly so it
 can load the workshop credentials and project settings before starting the agent.

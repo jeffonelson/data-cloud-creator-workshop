@@ -1,0 +1,11 @@
+[
+  {"name":"feedback_id","type":"STRING","mode":"NULLABLE","description":"Primary key. One row per review."},
+  {"name":"business_id","type":"STRING","mode":"NULLABLE","description":"Stable identifier of the reviewed business. STR-nnn joins to AlloyDB stores.store_id; CMP-nnn is a competitor with no operational record. Join on this, never on business_name."},
+  {"name":"business_name","type":"STRING","mode":"NULLABLE","description":"Display name of the reviewed business. Presentation only: not unique and not stable."},
+  {"name":"business_type","type":"STRING","mode":"NULLABLE","description":"Either 'own_store' or 'competitor'. Filter on this before drawing any conclusion about this brand."},
+  {"name":"zip_code","type":"STRING","mode":"NULLABLE","description":"ZIP of the reviewed business. Joins to demographics_and_traffic.zip_code."},
+  {"name":"rating","type":"INTEGER","mode":"NULLABLE","description":"Star rating, 1-5. Consistent with the sentiment of review_text."},
+  {"name":"source","type":"STRING","mode":"NULLABLE","description":"Review platform: 'Google Maps', 'Yelp' or 'DoorDash'."},
+  {"name":"review_date","type":"DATE","mode":"NULLABLE","description":"Date the review was posted, within 180 days of the scenario anchor date."},
+  {"name":"review_text","type":"STRING","mode":"NULLABLE","description":"Review prose, written by AI.GENERATE at provision time from a tone and topic label. Wording differs between projects; the sentiment it encodes does not."}
+]

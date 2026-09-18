@@ -1,0 +1,25 @@
+SKU-101,Classic Cortado,Espresso Drinks,4.25,30,false
+SKU-102,Oat Milk Lavender Latte,Espresso Drinks,6.75,45,false
+SKU-103,Brown Sugar Oat Shaken Espresso,Espresso Drinks,6.25,40,false
+SKU-104,Cardamom Rose Latte,Espresso Drinks,6.50,25,true
+SKU-105,Double Ristretto,Espresso Drinks,3.75,20,false
+SKU-201,Single-Origin Ethiopian Pour-Over,Filter Coffee,6.50,35,false
+SKU-202,Colombia Huila Pour-Over,Filter Coffee,6.00,30,false
+SKU-203,House Drip,Filter Coffee,3.25,50,false
+SKU-204,Chemex for Two,Filter Coffee,11.50,15,false
+SKU-301,Nitro Cold Brew on Tap,Cold Beverages,5.75,40,false
+SKU-302,Vietnamese Cold Brew,Cold Beverages,6.25,30,false
+SKU-303,Sparkling Espresso Tonic,Cold Beverages,6.00,25,true
+SKU-304,Iced Horchata Latte,Cold Beverages,6.50,30,true
+SKU-401,Ceremonial Matcha Latte,Tea & Matcha,7.00,25,false
+SKU-402,Hojicha Oat Latte,Tea & Matcha,6.75,20,false
+SKU-403,Masala Chai,Tea & Matcha,5.50,25,false
+SKU-501,House Blend Espresso Beans (12oz),Retail Beans,19.50,12,false
+SKU-502,Guatemala Geisha Whole Bean (8oz),Retail Beans,32.00,8,false
+SKU-503,Ethiopia Yirgacheffe (12oz),Retail Beans,22.00,10,false
+SKU-504,Decaf Colombia (12oz),Retail Beans,18.00,8,false
+SKU-601,Avocado Sourdough Toast,Food & Snacks,12.50,18,false
+SKU-602,Artisan Liege Waffle,Food & Snacks,6.00,20,false
+SKU-603,Cheddar & Chive Scone,Food & Snacks,5.25,22,false
+SKU-604,Morning Bun,Food & Snacks,4.75,20,false
+SKU-701,Ceramic Travel Tumbler,Merchandise,28.00,6,false

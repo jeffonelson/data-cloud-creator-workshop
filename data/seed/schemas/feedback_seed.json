@@ -1,0 +1,12 @@
+[
+  {"name":"feedback_id","type":"STRING","mode":"REQUIRED","description":"Primary key. One row per review."},
+  {"name":"business_id","type":"STRING","mode":"REQUIRED","description":"Stable identifier of the reviewed business. STR-nnn joins to AlloyDB stores.store_id; CMP-nnn is a competitor with no operational record. Join on this, never on business_name."},
+  {"name":"business_name","type":"STRING","mode":"REQUIRED","description":"Display name of the reviewed business. Presentation only: not unique and not stable."},
+  {"name":"business_type","type":"STRING","mode":"REQUIRED","description":"'own_store' or 'competitor'. Filter on this before drawing conclusions about this brand."},
+  {"name":"zip_code","type":"STRING","mode":"REQUIRED","description":"ZIP of the reviewed business."},
+  {"name":"rating","type":"INTEGER","mode":"REQUIRED","description":"Star rating, 1-5, derived from tone."},
+  {"name":"source","type":"STRING","mode":"REQUIRED","description":"Review platform: one of 'Google Maps', 'Yelp', 'DoorDash'."},
+  {"name":"review_date","type":"DATE","mode":"REQUIRED","description":"Date the review was posted, within 180 days of the anchor date."},
+  {"name":"tone","type":"STRING","mode":"REQUIRED","description":"Sentiment label that steers AI.GENERATE when writing review_text. Scaffolding, not an observed field."},
+  {"name":"topic","type":"STRING","mode":"REQUIRED","description":"Subject the review should discuss. Scaffolding, not an observed field."}
+]

@@ -1,0 +1,143 @@
+{
+  "anchor_date": "2026-09-01",
+  "brand": "Charlie's Coffee",
+  "city": "San Francisco",
+  "note": "Row counts and columns are stable. Checksums shift with anchor_date because dated columns move.",
+  "schema_version": "3.0",
+  "tables": {
+    "candidate_sites": {
+      "columns": [
+        "site_id",
+        "zip_code",
+        "neighborhood_name",
+        "street_address",
+        "latitude",
+        "longitude",
+        "available_sqft",
+        "monthly_rent",
+        "lease_term_months",
+        "listed_date"
+      ],
+      "row_count": 12,
+      "sha256": "1d5af4e381f101ee858ef62b01b4321ae8d6c4d7131e95c2fd266517a554cd8e",
+      "target": "bigquery"
+    },
+    "demographics_and_traffic": {
+      "columns": [
+        "zip_code",
+        "neighborhood_name",
+        "city",
+        "latitude",
+        "longitude",
+        "median_household_income",
+        "total_population",
+        "households",
+        "median_age",
+        "morning_foot_traffic_index",
+        "evening_foot_traffic_index",
+        "weekend_foot_traffic_index",
+        "foot_traffic_score"
+      ],
+      "row_count": 15,
+      "sha256": "86ffaac013dadaf5542c697fd8271c09cb1e5f6786e4328fe358e7c589dad4bc",
+      "target": "bigquery"
+    },
+    "feedback_seed": {
+      "columns": [
+        "feedback_id",
+        "business_id",
+        "business_name",
+        "business_type",
+        "zip_code",
+        "rating",
+        "source",
+        "review_date",
+        "tone",
+        "topic"
+      ],
+      "row_count": 300,
+      "sha256": "1847a107866f317367c904d7c16dc933987ccb9cab27d26c3fcb6bd39785ffcf",
+      "target": "bigquery"
+    },
+    "historical_sales": {
+      "columns": [
+        "week_start_date",
+        "store_id",
+        "zip_code",
+        "sku",
+        "units_sold",
+        "net_revenue"
+      ],
+      "row_count": 15600,
+      "sha256": "7987542dd8eeb25d2afcef383a48ad3d7e3f5715867d57958a2f89c9ebc43370",
+      "target": "bigquery"
+    },
+    "inventory": {
+      "columns": [
+        "store_id",
+        "sku",
+        "opening_stock",
+        "stock_count",
+        "last_counted_at"
+      ],
+      "row_count": 150,
+      "sha256": "7871178a5eb952a274995c6c28b4fd7badbf5fb7c724bea146094b2f5f0dd499",
+      "target": "alloydb"
+    },
+    "market_demand": {
+      "columns": [
+        "zip_code",
+        "week_start_date",
+        "category_spend_usd",
+        "transaction_count",
+        "avg_ticket"
+      ],
+      "row_count": 1560,
+      "sha256": "1a54ac1e2f486854e2e22cffa90e8eeab28e66652218c64c922ec2a16a2beca4",
+      "target": "bigquery"
+    },
+    "products": {
+      "columns": [
+        "sku",
+        "item_name",
+        "category",
+        "unit_price",
+        "reorder_threshold",
+        "is_seasonal"
+      ],
+      "row_count": 25,
+      "sha256": "c9d1e15971644a56c444d065934cb053cae8db61dbcde730f50c57cfc609b003",
+      "target": "alloydb"
+    },
+    "stock_movements": {
+      "columns": [
+        "movement_id",
+        "store_id",
+        "sku",
+        "movement_type",
+        "quantity_delta",
+        "occurred_at"
+      ],
+      "row_count": 10116,
+      "sha256": "074eaeae4b4b5ef22d0c26e0e320cc86a428a423191058541a73edcfb7a720b5",
+      "target": "alloydb"
+    },
+    "stores": {
+      "columns": [
+        "store_id",
+        "store_name",
+        "zip_code",
+        "address",
+        "latitude",
+        "longitude",
+        "opened_date",
+        "square_feet",
+        "status"
+      ],
+      "row_count": 6,
+      "sha256": "fc66fe3435f4faabb81d13e0d98838ce1622d13eb3c4f1247ab70d1c056104dc",
+      "target": "alloydb"
+    }
+  },
+  "total_rows": 27784
+}

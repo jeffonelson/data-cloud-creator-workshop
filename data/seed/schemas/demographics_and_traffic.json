@@ -1,0 +1,15 @@
+[
+  {"name":"zip_code","type":"STRING","mode":"REQUIRED","description":"San Francisco ZIP code. Primary key of this table and the conformed key joining sales, market demand, candidate sites and feedback."},
+  {"name":"neighborhood_name","type":"STRING","mode":"REQUIRED","description":"Representative neighbourhood label; ZIPs and neighbourhoods are not one-to-one. Presentation only; never join on this."},
+  {"name":"city","type":"STRING","mode":"REQUIRED","description":"City. Always 'San Francisco' in this scenario."},
+  {"name":"latitude","type":"FLOAT","mode":"REQUIRED","description":"Representative neighbourhood latitude, WGS84. Not a ZIP centroid or boundary."},
+  {"name":"longitude","type":"FLOAT","mode":"REQUIRED","description":"Representative neighbourhood longitude, WGS84."},
+  {"name":"median_household_income","type":"INTEGER","mode":"REQUIRED","description":"Synthetic median annual household income in USD; illustrative, not a Census estimate."},
+  {"name":"total_population","type":"INTEGER","mode":"REQUIRED","description":"Synthetic resident population of the ZIP; illustrative, not a Census estimate."},
+  {"name":"households","type":"INTEGER","mode":"REQUIRED","description":"Synthetic occupied household count."},
+  {"name":"median_age","type":"FLOAT","mode":"REQUIRED","description":"Synthetic median resident age in years."},
+  {"name":"morning_foot_traffic_index","type":"FLOAT","mode":"REQUIRED","description":"Relative pedestrian activity 06:00-11:00, indexed 0-100. Modelled, not measured. A static average over the whole period: this table keeps no time series."},
+  {"name":"evening_foot_traffic_index","type":"FLOAT","mode":"REQUIRED","description":"Relative pedestrian activity 17:00-21:00, indexed 0-100."},
+  {"name":"weekend_foot_traffic_index","type":"FLOAT","mode":"REQUIRED","description":"Relative pedestrian activity on Saturday and Sunday, indexed 0-100."},
+  {"name":"foot_traffic_score","type":"FLOAT","mode":"REQUIRED","description":"Unweighted mean of the morning, evening and weekend indices. 0-100, higher is busier. Derived: do not treat it as an independent measurement alongside its three components."}
+]

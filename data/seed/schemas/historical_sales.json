@@ -1,0 +1,8 @@
+[
+  {"name":"week_start_date","type":"DATE","mode":"REQUIRED","description":"Monday that opens the ISO week this row covers. Part of the grain."},
+  {"name":"store_id","type":"STRING","mode":"REQUIRED","description":"Store that made the sales. Joins to AlloyDB stores.store_id. Part of the grain."},
+  {"name":"zip_code","type":"STRING","mode":"REQUIRED","description":"ZIP of the selling store, denormalised from stores for query convenience. Functionally dependent on store_id; if the two ever disagree, stores is authoritative."},
+  {"name":"sku","type":"STRING","mode":"REQUIRED","description":"Product sold. Joins to AlloyDB products.sku. Part of the grain."},
+  {"name":"units_sold","type":"INTEGER","mode":"REQUIRED","description":"Units sold in the week. Reconciles exactly to the sum of SALE rows in AlloyDB stock_movements for the same store, SKU and complete week; the ledger and this table record the same events."},
+  {"name":"net_revenue","type":"NUMERIC","mode":"REQUIRED","description":"Revenue in USD after discounts and comps. NOT units_sold * products.unit_price: unit_price is the current list price, this is a historical figure, so the implied price is 92-100% of list."}
+]

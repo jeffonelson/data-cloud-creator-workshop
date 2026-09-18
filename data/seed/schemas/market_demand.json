@@ -1,0 +1,7 @@
+[
+  {"name":"zip_code","type":"STRING","mode":"REQUIRED","description":"ZIP the demand estimate covers. Part of the grain. Present for all 15 ZIPs, including the 9 with no store."},
+  {"name":"week_start_date","type":"DATE","mode":"REQUIRED","description":"Monday that opens the ISO week. Part of the grain."},
+  {"name":"category_spend_usd","type":"NUMERIC","mode":"REQUIRED","description":"Total coffee-category spend by ALL businesses in the ZIP that week, USD. Whole-market, not this brand: the third-party panel series a retailer buys. Divide historical_sales revenue by this to recover a store's capture rate."},
+  {"name":"transaction_count","type":"INTEGER","mode":"REQUIRED","description":"Coffee-category transactions across all businesses in the ZIP that week."},
+  {"name":"avg_ticket","type":"NUMERIC","mode":"REQUIRED","description":"category_spend_usd / transaction_count, USD. Derived."}
+]

@@ -1,0 +1,12 @@
+[
+  {"name":"site_id","type":"STRING","mode":"REQUIRED","description":"Primary key. A prospective location only: no site_id ever appears in stores, sales or inventory."},
+  {"name":"zip_code","type":"STRING","mode":"REQUIRED","description":"ZIP the property sits in. The only join path to demand, demographics and feedback, since a candidate has no trading history."},
+  {"name":"neighborhood_name","type":"STRING","mode":"REQUIRED","description":"Neighbourhood name. Presentation only."},
+  {"name":"street_address","type":"STRING","mode":"REQUIRED","description":"Illustrative street block for a fictional opportunity; not an actual available property or exact building address."},
+  {"name":"latitude","type":"FLOAT","mode":"REQUIRED","description":"Approximate retail-corridor latitude, WGS84; not a surveyed property point."},
+  {"name":"longitude","type":"FLOAT","mode":"REQUIRED","description":"Approximate retail-corridor longitude, WGS84."},
+  {"name":"available_sqft","type":"INTEGER","mode":"REQUIRED","description":"Leasable floor area. Compare against stores.square_feet, which is the same measure for a trading store."},
+  {"name":"monthly_rent","type":"NUMERIC","mode":"REQUIRED","description":"Synthetic asking rent per month in USD, excluding fit-out and operating costs; not a market quote."},
+  {"name":"lease_term_months","type":"INTEGER","mode":"REQUIRED","description":"Lease length offered, in months."},
+  {"name":"listed_date","type":"DATE","mode":"REQUIRED","description":"Date the property came to market. The site lifecycle analogue of stores.opened_date."}
+]
