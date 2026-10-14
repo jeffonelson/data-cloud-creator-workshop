@@ -9,6 +9,7 @@ workshop_load_config
 project_id="$(workshop_saved_project)"
 workshop_project_id_is_valid "$project_id" || { echo 'Run ./bin/setup PROJECT_ID before starting Antigravity MCP servers.' >&2; exit 1; }
 workshop_export_project_env "$project_id"
+workshop_source_env_local
 export WORKSHOP_DAK_PROXY="$repo_root/.workshop-state/antigravity-source/$DAK_PROXY_RELATIVE_PATH"
 [[ -f "$WORKSHOP_DAK_PROXY" ]] || { echo 'Antigravity DAK source is missing; run ./bin/setup.' >&2; exit 1; }
 # Read only the needed key. Values stay in this MCP process and its child.

@@ -4,6 +4,11 @@
 #
 # Nothing here may print, log, or persist an API-key value.
 
+# Never let gcloud stop for an interactive prompt (for example "API not enabled,
+# enable and retry? (y/N)"). The scripts discard gcloud's stderr on their
+# checks, so a prompt is invisible and the script appears to hang.
+export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+
 # ---------------------------------------------------------------------------
 # Status output
 #

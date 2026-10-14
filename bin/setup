@@ -80,7 +80,16 @@ if ! gcloud projects describe "$GCP_PROJECT_ID" --project="$GCP_PROJECT_ID" >/de
   exit 1
 fi
 
-for secret_id in "$DK_SECRET_ID" "$MAPS_SECRET_ID"; do
+# Keys supplied through the environment or .env.local need no secret, matching
+# workshop_prepare_launch and ./bin/doctor.
+workshop_source_env_local
+for secret_pair in "WORKSHOP_DK_API_KEY:$DK_SECRET_ID" "WORKSHOP_MAPS_API_KEY:$MAPS_SECRET_ID"; do
+  variable_name="${secret_pair%%:*}"
+  secret_id="${secret_pair#*:}"
+  if [[ -n "${!variable_name:-}" ]]; then
+    workshop_info "$variable_name is set locally; skipping Secret Manager secret: $secret_id"
+    continue
+  fi
   if ! gcloud secrets versions access "$SECRET_VERSION" \
     --secret="$secret_id" \
     --project="$GCP_PROJECT_ID" \
