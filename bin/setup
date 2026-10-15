@@ -10,19 +10,26 @@ state_dir="$(workshop_state_dir)"
 mkdir -p "$state_dir"
 project_state="$(workshop_project_state_file)"
 
-if (( $# > 1 )); then
-  echo "Usage: $0 PROJECT_ID" >&2
-  exit 2
-fi
+usage() {
+  echo "Usage: $0 [PROJECT_ID]"
+  echo "Installs one Data Agent Kit release and configures BigQuery and AlloyDB."
+}
 
-if [[ -n "${1:-}" ]]; then
-  GCP_PROJECT_ID="$1"
-else
-  GCP_PROJECT_ID="$(workshop_saved_project)"
-fi
+GCP_PROJECT_ID=''
+for argument in "$@"; do
+  case "$argument" in
+    --help|-h) usage; exit 0 ;;
+    -*) usage >&2; exit 2 ;;
+    *)
+      [[ -z "$GCP_PROJECT_ID" ]] || { echo "Supply only one project ID." >&2; exit 2; }
+      GCP_PROJECT_ID="$argument"
+      ;;
+  esac
+done
+[[ -n "$GCP_PROJECT_ID" ]] || GCP_PROJECT_ID="$(workshop_saved_project)"
 
 if [[ -z "$GCP_PROJECT_ID" ]]; then
-  echo "Usage: $0 PROJECT_ID" >&2
+  usage >&2
   echo "Use the dedicated Google Cloud project assigned to you." >&2
   exit 2
 fi
@@ -40,8 +47,13 @@ require_command() {
 }
 
 require_command gcloud
+require_command git
 require_command node
 require_command npm
+if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 6) ? 0 : 1)'; then
+  workshop_error "Data Agent Kit setup requires Node.js 22.6 or newer. Install the current Node.js LTS release."
+  exit 1
+fi
 
 # Configure whichever supported coding agents are installed. At least one is
 # required; every installed supported agent is configured.
@@ -80,16 +92,7 @@ if ! gcloud projects describe "$GCP_PROJECT_ID" --project="$GCP_PROJECT_ID" >/de
   exit 1
 fi
 
-# Keys supplied through the environment or .env.local need no secret, matching
-# workshop_prepare_launch and ./bin/doctor.
-workshop_source_env_local
-for secret_pair in "WORKSHOP_DK_API_KEY:$DK_SECRET_ID" "WORKSHOP_MAPS_API_KEY:$MAPS_SECRET_ID"; do
-  variable_name="${secret_pair%%:*}"
-  secret_id="${secret_pair#*:}"
-  if [[ -n "${!variable_name:-}" ]]; then
-    workshop_info "$variable_name is set locally; skipping Secret Manager secret: $secret_id"
-    continue
-  fi
+for secret_id in "$DK_SECRET_ID" "$MAPS_SECRET_ID"; do
   if ! gcloud secrets versions access "$SECRET_VERSION" \
     --secret="$secret_id" \
     --project="$GCP_PROJECT_ID" \
@@ -101,75 +104,95 @@ for secret_pair in "WORKSHOP_DK_API_KEY:$DK_SECRET_ID" "WORKSHOP_MAPS_API_KEY:$M
 done
 
 umask 077
+# Reject a conflicting shared upstream configuration before changing any agent.
+workshop_dak_settings preflight "$GCP_PROJECT_ID"
+
+# Data Agent Kit version. DAK_REF overrides; otherwise reuse the release this
+# checkout already recorded, and only on a fresh checkout (or after teardown)
+# resolve the newest upstream release. Every agent below installs this one ref.
+if [[ -n "${DAK_REF:-}" ]] && ! workshop_dak_ref_is_valid "$DAK_REF"; then
+  workshop_error "DAK_REF must be an immutable release tag or full commit SHA."
+  exit 1
+fi
+if ! DAK_EFFECTIVE_REF="$(workshop_effective_dak_ref)"; then
+  workshop_info "Resolving the latest Data Agent Kit release..."
+  if ! DAK_EFFECTIVE_REF="$(workshop_latest_dak_release)"; then
+    workshop_error "Cannot determine the latest Data Agent Kit release from $DAK_REPOSITORY"
+    workshop_hint "Check network access, or pin DAK_REF in config/workshop.env."
+    exit 1
+  fi
+fi
+printf '%s\n' "$DAK_EFFECTIVE_REF" >"$(workshop_dak_ref_state_file)"
+if [[ -n "${DAK_REF:-}" ]]; then
+  workshop_ok "Data Agent Kit version pinned by config/workshop.env: $DAK_EFFECTIVE_REF"
+else
+  workshop_ok "Data Agent Kit release: $DAK_EFFECTIVE_REF"
+fi
+
+# Inspect every supported CLI before changing either installation. Leave old
+# Starter Pack installs and mismatched GA installs for the attendee to resolve.
+for agent in codex claude; do
+  command -v "$agent" >/dev/null 2>&1 || continue
+  legacy_plugin="$(workshop_agent_entry "$agent" plugin dak@data-agent-kit-starter-pack-marketplace)"
+  if [[ "$legacy_plugin" != null ]]; then
+    workshop_error "$agent: the previous DAK Starter Pack is installed. Preserve it or remove it with that agent's plugin commands before migrating; setup will not replace it."
+    exit 1
+  fi
+  marketplace_entry="$(workshop_agent_entry "$agent" marketplace)"
+  plugin_entry="$(workshop_agent_entry "$agent" plugin)"
+  if [[ "$marketplace_entry" != null || "$plugin_entry" != null ]]; then
+    if ! report="$(workshop_check_dak_installation "$agent" "$DAK_EFFECTIVE_REF" existing)"; then
+      printf '%s\n' "$report"
+      workshop_error "Resolve the existing $agent DAK installation with its plugin commands, then retry. Setup does not upgrade pre-existing installations."
+      exit 1
+    fi
+  fi
+done
+
 printf 'GCP_PROJECT_ID=%s\n' "$GCP_PROJECT_ID" >"$project_state"
 workshop_ok "Workshop project $GCP_PROJECT_ID and Secret Manager access are ready."
+
+setup_agent_dak() {
+  local agent="$1" marketplace_entry plugin_entry
+  local marketplace_marker=marketplace-added-by-workshop plugin_marker=plugin-added-by-workshop
+  [[ "$agent" != claude ]] || { marketplace_marker=claude-marketplace-added-by-workshop; plugin_marker=claude-plugin-added-by-workshop; }
+  marketplace_entry="$(workshop_agent_entry "$agent" marketplace)"
+  plugin_entry="$(workshop_agent_entry "$agent" plugin)"
+  if [[ "$marketplace_entry" == null ]]; then
+    if [[ "$agent" == codex ]]; then
+      codex plugin marketplace add "$DAK_REPOSITORY" --ref "$DAK_EFFECTIVE_REF"
+    else
+      claude plugin marketplace add "$DAK_REPOSITORY.git#$DAK_EFFECTIVE_REF"
+    fi
+    touch "$state_dir/$marketplace_marker"
+  fi
+  if [[ "$plugin_entry" == null ]]; then
+    if [[ "$agent" == codex ]]; then
+      codex plugin add "$DAK_PLUGIN"
+    else
+      claude plugin install "$DAK_PLUGIN" --yes
+    fi
+    touch "$state_dir/$plugin_marker"
+  fi
+  if ! workshop_check_dak_installation "$agent" "$DAK_EFFECTIVE_REF"; then
+    workshop_error "$agent: DAK did not reach the requested release; inspect its plugin installation and retry."
+    return 1
+  fi
+  workshop_configure_dak "$agent" "$(workshop_dak_plugin_root "$agent")" "$GCP_PROJECT_ID"
+}
 
 if [[ "$has_codex" == true ]]; then
   echo
   workshop_info "Configuring Codex..."
 
-  marketplace_entry="$(workshop_agent_entry codex marketplace)"
-  if [[ "$marketplace_entry" != null ]]; then
-    workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
-  else
-    # Codex takes the ref as a flag; Claude Code takes it as a URL fragment
-    # further down. Both read the same DAK_REF, and both track the default
-    # branch when it is empty.
-    if [[ -n "${DAK_REF:-}" ]]; then
-      workshop_info "Adding Data Agent Kit marketplace at ref: $DAK_REF"
-      codex plugin marketplace add "$DAK_REPOSITORY" --ref "$DAK_REF"
-    else
-      workshop_info "Adding Data Agent Kit marketplace at the default branch"
-      codex plugin marketplace add "$DAK_REPOSITORY"
-    fi
-    touch "$state_dir/marketplace-added-by-workshop"
-  fi
-
-  plugin_entry="$(workshop_agent_entry codex plugin)"
-  if [[ "$plugin_entry" != null ]]; then
-    workshop_ok "Plugin already installed: $DAK_PLUGIN"
-  else
-    workshop_info "Installing Data Agent Kit plugin..."
-    codex plugin add "$DAK_PLUGIN"
-    touch "$state_dir/plugin-added-by-workshop"
-  fi
+  setup_agent_dak codex
 fi
 
 if [[ "$has_claude" == true ]]; then
   echo
   workshop_info "Configuring Claude Code..."
 
-  # Installed at user scope, matching how Claude Code plugins are normally
-  # installed. The plugin is therefore enabled in every project the attendee
-  # opens until ./bin/teardown runs.
-  marketplace_entry="$(workshop_agent_entry claude marketplace)"
-  if [[ "$marketplace_entry" != null ]]; then
-    workshop_ok "Marketplace already configured: $DAK_MARKETPLACE"
-  else
-    # Claude Code takes the ref as a git URL fragment.
-    dak_marketplace_source="$DAK_REPOSITORY.git"
-    if [[ -n "${DAK_REF:-}" ]]; then
-      workshop_info "Adding Data Agent Kit marketplace at ref: $DAK_REF"
-      dak_marketplace_source="$dak_marketplace_source#$DAK_REF"
-    else
-      workshop_info "Adding Data Agent Kit marketplace at the default branch"
-    fi
-    claude plugin marketplace add "$dak_marketplace_source"
-    touch "$state_dir/claude-marketplace-added-by-workshop"
-  fi
-
-  plugin_entry="$(workshop_agent_entry claude plugin)"
-  if [[ "$plugin_entry" != null ]]; then
-    workshop_ok "Plugin already installed: $DAK_PLUGIN"
-  else
-    workshop_info "Installing Data Agent Kit plugin..."
-    # GCP_REGION is the only option the plugin declares since DAK 0.10.1.
-    # PROJECT_ID and BIGQUERY_LOCATION were removed upstream; the MCP servers
-    # take the project as a tool argument instead.
-    claude plugin install "$DAK_PLUGIN" --yes \
-      --config "GCP_REGION=$DAK_GCP_REGION"
-    touch "$state_dir/claude-plugin-added-by-workshop"
-  fi
+  setup_agent_dak claude
 fi
 
 echo
@@ -178,6 +201,7 @@ if [[ "$has_antigravity" == true ]]; then
   workshop_setup_antigravity
 fi
 workshop_print_line "$WORKSHOP_SGR_GREEN$WORKSHOP_SGR_BOLD" 1 "Setup complete for project: $GCP_PROJECT_ID"
+echo "Restart any open agent session to load the configured Data Agent Kit services."
 if [[ "$has_codex" == true ]]; then
   echo "Launch Codex with:        ./bin/workshop-codex"
 fi

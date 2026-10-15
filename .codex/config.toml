@@ -55,51 +55,9 @@ approval_mode = "auto"
 [mcp_servers.cloud_run.tools.list_services]
 approval_mode = "auto"
 
-# The Data Agent Kit plugin includes MCP servers for many Google Cloud products.
-# This workshop uses only its hosted BigQuery and AlloyDB servers; disabling the
-# rest keeps the Codex tool context focused. Developer Knowledge, Maps, and
-# Cloud Run above are separate project-scoped servers and remain enabled.
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.bigquery]
-enabled = true
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."alloydb-postgres"]
-enabled = true
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.bigtable]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."cloud-sql-postgresql"]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."cloud-storage"]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.dataproc]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.knowledge_catalog]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.notebook]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.spanner]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers.visualization]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."alloydb-local"]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."bigquery-local"]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."developer-knowledge"]
-enabled = false
-
-[plugins."dak@data-agent-kit-starter-pack-marketplace".mcp_servers."maps-grounding-lite"]
-enabled = false
+# Upstream dak-setup selects BigQuery and AlloyDB in the installed plugin.
+# It also supplies its notebook and visualization tools. No copied DAK server
+# list is maintained here; the three workshop additions above remain separate.
 
 # Keep the API keys available to Codex's HTTP MCP client, but do not forward
 # them into shell commands launched by the agent. The legacy exclusion array

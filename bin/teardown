@@ -10,6 +10,11 @@ state_dir="$(workshop_state_dir)"
 
 removed_anything=false
 
+if [[ -f "$state_dir/dak-config-added-by-workshop" ]]; then
+  workshop_dak_settings remove
+  removed_anything=true
+fi
+
 if [[ -f "$state_dir/antigravity-added-by-workshop.json" ]]; then
   workshop_antigravity_config teardown
   removed_anything=true
@@ -51,6 +56,12 @@ fi
 if [[ -f "$state_dir/project.env" ]]; then
   rm -f "$state_dir/project.env"
   workshop_ok "Removed this checkout's workshop project selection."
+  removed_anything=true
+fi
+
+if [[ -f "$state_dir/dak-ref" ]]; then
+  rm -f "$state_dir/dak-ref"
+  workshop_ok "Removed the recorded Data Agent Kit version; the next setup installs the current release."
   removed_anything=true
 fi
 

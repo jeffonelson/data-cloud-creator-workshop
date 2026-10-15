@@ -70,12 +70,11 @@ function main() {
     console.log('Antigravity: workshop additions removed; pre-existing plugins preserved.');
     return;
   }
-  // Native manifest: upstream commit 0167f8c8421f521f39fd5d011d2243f6e90ef615
-  // (test_978762497), kept as a fallback
-  // until it is present on main. No other agent's MCP format is translated.
+  // Upstream dak-setup generates this native manifest. Only add cwd for the
+  // retained desktop discovery path; no copied manifest or URL translation.
   const upstream = path.join(source, 'mcp_config.json');
-  const native = read(fs.existsSync(upstream) ? upstream : path.join(root,'config/antigravity-mcp.json'));
-  if (!native.mcpServers?.bigquery || !native.mcpServers?.['alloydb-postgres'] ||
+  const native = read(upstream);
+  if (!native.mcpServers?.['dak-bigquery'] || !native.mcpServers?.['dak-alloydb'] ||
       !fs.existsSync(path.join(source,proxySuffix))) throw new Error('Incomplete DAK checkout; run setup again.');
   for (const entry of Object.values(native.mcpServers)) {
     // Resolve against the installed plugin, never the attendee's current folder.

@@ -4,11 +4,6 @@
 #
 # Nothing here may print, log, or persist an API-key value.
 
-# Never let gcloud stop for an interactive prompt (for example "API not enabled,
-# enable and retry? (y/N)"). The scripts discard gcloud's stderr on their
-# checks, so a prompt is invisible and the script appears to hang.
-export CLOUDSDK_CORE_DISABLE_PROMPTS=1
-
 # ---------------------------------------------------------------------------
 # Status output
 #
@@ -124,6 +119,61 @@ workshop_project_id_is_valid() {
   [[ "${1:-}" =~ $PROJECT_ID_PATTERN ]]
 }
 
+# ---------------------------------------------------------------------------
+# Data Agent Kit version
+#
+# DAK_REF in config/workshop.env is an override and is normally empty. When it
+# is empty, bin/setup resolves the newest upstream release tag once and records
+# it in .workshop-state/dak-ref, so every agent on this machine installs the
+# same version and nothing drifts during a workshop. bin/teardown removes the
+# record, so teardown followed by setup moves to the current release.
+# ---------------------------------------------------------------------------
+
+DAK_REF_PATTERN='^(v?[0-9]+\.[0-9]+\.[0-9]+|[0-9a-fA-F]{40})$'
+
+workshop_dak_ref_state_file() {
+  printf '%s' "$repo_root/.workshop-state/dak-ref"
+}
+
+workshop_dak_ref_is_valid() {
+  [[ "${1:-}" =~ $DAK_REF_PATTERN ]]
+}
+
+# Echoes the newest upstream release tag: MAJOR.MINOR.PATCH with an optional v
+# prefix and no prerelease suffix. Returns non-zero when it cannot be
+# determined. git ls-remote needs no token and has no per-IP rate limit, unlike
+# the GitHub API, which a room on shared wifi would exhaust during setup.
+workshop_latest_dak_release() {
+  local tags
+  command -v git >/dev/null 2>&1 || return 1
+  tags="$(GIT_TERMINAL_PROMPT=0 git ls-remote --tags --refs "$DAK_REPOSITORY" 2>/dev/null)" || return 1
+  printf '%s\n' "$tags" \
+    | sed -n 's|.*refs/tags/||p' \
+    | awk -F. '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ { t = $0; sub(/^v/, "", t); split(t, p, "."); print p[1], p[2], p[3], $0 }' \
+    | sort -k1,1n -k2,2n -k3,3n \
+    | tail -n 1 \
+    | awk 'NF { printf "%s", $4 }' \
+    | grep .
+}
+
+# Echoes the ref recorded by setup, or nothing when none is recorded.
+workshop_saved_dak_ref() {
+  local state_file
+  state_file="$(workshop_dak_ref_state_file)"
+  [[ -f "$state_file" ]] || return 0
+  head -n 1 "$state_file"
+}
+
+# Echoes the ref this checkout should be using: the DAK_REF override when set,
+# otherwise the recorded release. Returns non-zero when neither exists or the
+# value is malformed.
+workshop_effective_dak_ref() {
+  local ref="${DAK_REF:-}"
+  [[ -n "$ref" ]] || ref="$(workshop_saved_dak_ref)"
+  workshop_dak_ref_is_valid "$ref" || return 1
+  printf '%s' "$ref"
+}
+
 # Scopes Google Cloud project selection to this process only. It never changes
 # the user's global gcloud configuration.
 workshop_export_project_env() {
@@ -222,28 +272,151 @@ workshop_agent_entry() {
       console.error("Cannot read " + agent + " " + kind + " listing; check the CLI and retry.");
       process.exit(1);
     }
-  ' "$agent" "$kind" "$DAK_PLUGIN" "$DAK_MARKETPLACE" <<<"$listing"
+  ' "$agent" "$kind" "${3:-$DAK_PLUGIN}" "${3:-$DAK_MARKETPLACE}" <<<"$listing"
+}
+
+# Both callers check the actual installed version as well as its marketplace.
+workshop_check_dak_installation() {
+  local agent="$1" ref="$2" marketplace plugin
+  marketplace="$(workshop_agent_entry "$agent" marketplace)" || return 1
+  plugin="$(workshop_agent_entry "$agent" plugin)" || return 1
+  printf '%s\n%s\n' "$marketplace" "$plugin" |
+    node -e '
+      const fs = require("fs"), {spawnSync} = require("child_process");
+      const [agent, ref, repository, mode] = process.argv.slice(1);
+      let failed = false;
+      const report = (ok, text) => { console.log((ok ? "PASS " : "FAIL ") + agent + ": " + text); failed ||= !ok; };
+      try {
+        const [market, plugin] = fs.readFileSync(0,"utf8").trim().split("\n").map(JSON.parse);
+        const source = agent === "codex" ? market?.marketplaceSource?.source : market?.url;
+        const actualRef = agent === "codex" ? market?.marketplaceSource?.ref : market?.ref;
+        const sameSource = Boolean(source) && source.replace(/\.git$/, "") === repository.replace(/\.git$/, "");
+        report(sameSource, "DAK marketplace source " + (sameSource ? "matches" : "differs from") + " the workshop repository");
+        if (agent !== "codex" || actualRef !== undefined)
+          report(actualRef === ref, `marketplace ref is ${actualRef || "the default branch"}; expected ${ref}`);
+        let version = /^v?\d+\.\d+\.\d+$/.test(ref) ? ref.replace(/^v/, "") : "";
+        if (!version && market && /^[0-9a-f]{40}$/i.test(ref)) {
+          const root = agent === "codex" ? market.root : market.installLocation;
+          if (root) {
+            const git = args => spawnSync("git", ["-C", root, ...args], {encoding:"utf8"});
+            const head = git(["rev-parse", "HEAD"]);
+            const target = git(["rev-parse", "--verify", ref + "^{commit}"]);
+            if (head.status === 0 && target.status === 0 && head.stdout === target.stdout) {
+              const manifest = git(["show", "HEAD:plugin.json"]);
+              if (manifest.status === 0) version = JSON.parse(manifest.stdout).version;
+            }
+          }
+        }
+        if (plugin || mode !== "existing") {
+          report(Boolean(plugin && version && plugin.version === version), `installed DAK version is ${plugin?.version || "missing"}; expected ${version || ref}`);
+          report(Boolean(plugin) && plugin.enabled !== false && (agent !== "claude" || plugin.scope === "user"), "DAK must be enabled at the supported user scope");
+        }
+      } catch { report(false, "cannot verify DAK installation metadata; check the CLI listing and retry"); }
+      process.exitCode = failed ? 1 : 0;
+    ' "$agent" "$ref" "$DAK_REPOSITORY" "${3:-}"
+}
+
+# Upstream owns this non-secret user config. Only remove a file we created and
+# whose content still matches our marker; never overwrite another DAK setup.
+workshop_dak_settings() {
+  node -e '
+    const fs = require("fs"), path = require("path"), {isDeepStrictEqual: equal} = require("util");
+    const [mode, state, project, region] = process.argv.slice(1);
+    const file = path.join(require("os").homedir(), ".config/data-agent-kit/config.json");
+    const marker = path.join(state, "dak-config-added-by-workshop");
+    const read = p => fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,"utf8")) : null;
+    try {
+      const current = read(file), owned = read(marker);
+      const wanted = {projectId:project, region, services:["BigQuery", "AlloyDB"]};
+      if (mode === "remove") {
+        if (owned) {
+          if (equal(current, owned)) fs.unlinkSync(file);
+          else if (current) console.error("Preserved the upstream DAK configuration because it was changed after setup.");
+          fs.unlinkSync(marker);
+        }
+      } else if (mode === "check" || mode === "record") {
+        if (!equal(current, wanted)) throw Error("DAK project, region, or services differ; run ./bin/setup PROJECT_ID.");
+        if (mode === "record" && owned)
+          fs.writeFileSync(marker, JSON.stringify(wanted) + "\n", {mode:0o600});
+      } else {
+        if (current && !equal(current, wanted) && !equal(current, owned))
+          throw Error("Existing upstream DAK configuration differs. Preserve or reconfigure it with upstream dak-setup before retrying; workshop setup will not overwrite it.");
+        // Keep the previous ownership snapshot until upstream actually saves
+        // a new project, so an interrupted switch can be retried safely.
+        if (mode === "claim" && !current)
+          fs.writeFileSync(marker, JSON.stringify(wanted) + "\n", {mode:0o600});
+      }
+    } catch (error) {
+      console.error(error instanceof SyntaxError || error.code ? "Cannot read or update upstream DAK configuration; check its JSON and file permissions." : error.message);
+      process.exitCode = 1;
+    }
+  ' "$1" "$(workshop_state_dir)" "${2:-}" "$DAK_GCP_REGION"
+}
+
+# Configure an isolated installed copy, never a marketplace staging checkout.
+# Clear inherited agent indicators so running setup inside one agent cannot
+# accidentally configure the other agent using the wrong MCP format.
+workshop_configure_dak() {
+  local agent="$1" plugin_root="$2" project="$3" indicator manifest
+  case "$agent" in
+    codex) indicator=CODEX_THREAD_ID=workshop-setup; manifest=mcp.json ;;
+    claude) indicator=CLAUDECODE=1; manifest=.claude-plugin/mcp.json ;;
+    antigravity) indicator=ANTIGRAVITY_AGENT=1; manifest=mcp_config.json ;;
+    *) return 1 ;;
+  esac
+  if [[ ! -f "$plugin_root/skills/dak-setup/scripts/dak-setup.js" ]]; then
+    workshop_error "$agent: the bundled GA DAK setup script is missing; inspect the installed plugin."
+    return 1
+  fi
+  workshop_dak_settings claim "$project" || return 1
+  env -u ANTIGRAVITY_AGENT -u ANTIGRAVITY_CONVERSATION_ID -u CLAUDECODE \
+    -u CLAUDE_CODE_ENTRYPOINT -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u PLUGIN_ROOT \
+    "$indicator" node "$plugin_root/skills/dak-setup/scripts/dak-setup.js" save \
+    --project-id "$project" --region "$DAK_GCP_REGION" --services BigQuery AlloyDB || return 1
+  # DAK 1.1.0 can report a write failure with exit status zero. Verify outputs.
+  workshop_dak_settings record "$project" || return 1
+  workshop_check_dak_configuration "$plugin_root" "$manifest"
+}
+
+workshop_check_dak_configuration() {
+  node -e '
+    try {
+      const fs = require("fs"), path = require("path"), root = process.argv[1];
+      const servers = JSON.parse(fs.readFileSync(path.join(root, process.argv[2]), "utf8")).mcpServers;
+      const names = ["dak-bigquery", "dak-alloydb", "dak-notebook", "dak-viz"];
+      // Codex can restore the upstream catalog after setup. Extra upstream
+      // servers do not invalidate the workshop services; never rewrite its cache.
+      const allowExtra = process.argv[3] === "codex";
+      if ((!allowExtra && Object.keys(servers).length !== names.length) ||
+          names.some(name => !servers[name] || servers[name].disabled)) throw Error();
+      if (!fs.existsSync(path.join(root, "skills/bigquery-ai-ml/SKILL.md"))) throw Error();
+    } catch { console.error("DAK service configuration is incomplete; inspect the installed plugin and retry setup."); process.exitCode = 1; }
+  ' "$1" "$2" "${3:-}"
+}
+
+workshop_dak_plugin_root() {
+  local entry
+  entry="$(workshop_agent_entry "$1" plugin)" || return 1
+  node -e '
+    const [agent, home] = process.argv.slice(1);
+    const entry = JSON.parse(require("fs").readFileSync(0,"utf8"));
+    const root = agent === "codex"
+      ? entry?.marketplaceName && entry.name && entry.version && require("path").join(home,"plugins/cache",entry.marketplaceName,entry.name,entry.version)
+      : entry?.installPath;
+    if (!root) process.exit(1);
+    console.log(root);
+  ' "$1" "${CODEX_HOME:-$HOME/.codex}" <<<"$entry"
 }
 
 # Echoes the absolute path of an installed Data Agent Kit MCP proxy, or returns
 # non-zero when neither agent has one. Pass claude or codex to check a single
 # agent; pass nothing to accept whichever is installed.
 workshop_dak_proxy_path() {
-  local agent entry candidate
+  local agent plugin_root candidate
   for agent in ${1:-claude codex}; do
     command -v "$agent" >/dev/null 2>&1 || continue
-    entry="$(workshop_agent_entry "$agent" plugin)" || continue
-    candidate="$(node -e '
-      const [agent, codexHome, suffix] = process.argv.slice(1);
-      const entry = JSON.parse(require("fs").readFileSync(0, "utf8"));
-      if (!entry) process.exit(0);
-      // Codex source.path is a staging checkout; rebuild the installed path.
-      const root = agent === "codex"
-        ? entry.marketplaceName && entry.name && entry.version &&
-          [codexHome, "plugins/cache", entry.marketplaceName, entry.name, entry.version].join("/")
-        : entry.installPath;
-      if (root) console.log(root + "/" + suffix);
-    ' "$agent" "${CODEX_HOME:-$HOME/.codex}" "$DAK_PROXY_RELATIVE_PATH" <<<"$entry")" || continue
+    plugin_root="$(workshop_dak_plugin_root "$agent")" || continue
+    candidate="$plugin_root/$DAK_PROXY_RELATIVE_PATH"
     if [[ -n "$candidate" && -f "$candidate" ]]; then
       printf '%s' "$candidate"
       return 0
@@ -294,6 +467,7 @@ workshop_prepare_launch() {
     return 1
   fi
 
+  workshop_dak_settings check "$project_id" || return 1
   workshop_export_project_env "$project_id"
   workshop_source_env_local
   workshop_load_secret_if_unset WORKSHOP_DK_API_KEY "$DK_SECRET_ID" "$project_id" || return 1

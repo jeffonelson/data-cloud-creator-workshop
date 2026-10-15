@@ -3,60 +3,79 @@
 A hands-on workshop using AI coding agents and Google Cloud data tools to explore
 a coffee shop expansion scenario.
 
-You need:
+Prepare your computer a few days before the workshop. Your Skills/Qwiklabs lab
+will provide the Google Cloud project and access instructions on workshop day;
+you do not need to create a personal Cloud project, billing account, or free trial.
+Afterward, you can [recreate the workshop in your own project](#after-the-workshop-use-your-own-project-optional).
 
-- A prepared workshop project ID, or your own Google Cloud project with billing enabled
-- Google Cloud CLI and Node.js
-- Codex CLI, Claude Code CLI, or Antigravity CLI (`agy`)
+## Before the workshop: check your computer
 
-## Set up
+Install these prerequisites using their official instructions:
 
-Sign in if needed:
+- [Git](https://git-scm.com/downloads)
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+- [Node.js 22.6 or newer and npm](https://nodejs.org/en/download) (current LTS recommended)
+- One supported agent: [Codex CLI](https://developers.openai.com/codex/cli/),
+  [Claude Code CLI](https://code.claude.com/docs/en/setup), or
+  [Antigravity CLI](https://www.antigravity.google/docs/cli/install/)
 
-```bash
-gcloud auth login
-gcloud auth application-default login
-```
-
-### 1. Clone the repository
+Clone the repository:
 
 ```bash
 git clone https://github.com/jeffonelson/data-cloud-creator-workshop.git
 cd data-cloud-creator-workshop
 ```
 
-### 2. Provision your own project (skip if yours is already prepared)
-
-Use a project you own with billing enabled, preferably a fresh project dedicated
-to this demo. Install Python 3 and the Google Cloud CLI including `bq`, then run:
+Then check local prerequisites:
 
 ```bash
-./bin/provision YOUR_PROJECT_ID
+./bin/doctor --preflight
 ```
 
-Allow about 15–20 minutes. This creates AlloyDB, BigQuery demo data and
-connections, a staging bucket, dedicated networking, and the keys/secrets needed
-by the agents. It uses your signed-in account and leaves your global gcloud
-project setting unchanged. Organization policies or quotas may require an admin.
+This checks command availability and the minimum Node.js version. It makes no
+cloud requests, starts no login flow, and installs or configures nothing. No
+Google sign-in, project, or credit card is required. Fix any reported failures
+using the installation links and rerun until there are zero failures.
 
-Retries preserve completed data loads and credentials. To deliberately replace
-the demo tables and regenerate reviews, use `./bin/provision YOUR_PROJECT_ID --reset-data`.
-Conflicting resources are never adopted. AlloyDB incurs ongoing charges; delete
-your dedicated demo project when finished. `./bin/teardown` only removes local setup.
+A passing preflight confirms local prerequisites only. Agent sign-in, Google
+authentication, project permissions, plugins, and live tools are checked later.
 
-### 3. Configure and verify
+## Workshop day: connect your assigned project
 
-Replace the placeholder below, including the angle brackets, with your
-Google Cloud project ID.
+### 1. Sign in for the lab
+
+Follow the lab's instructions to obtain your assigned project ID and the identity
+to use. Authenticate as that identity; replace `YOUR_LAB_PROJECT_ID` below with
+the assigned project ID:
+
+```bash
+gcloud auth login --project=YOUR_LAB_PROJECT_ID
+gcloud auth application-default login --project=YOUR_LAB_PROJECT_ID
+```
+
+Sign in to your chosen agent CLI if needed: `codex login`, `claude auth login`,
+or `agy`. Agent sign-in is separate from Google Cloud sign-in. Workshop resources
+are prepared by the organizers; skip provisioning for your assigned lab project.
+
+### 2. Configure and verify
 
 `./bin/setup` checks access to your project and secrets, then installs
-and configures the Data Agent Kit plugin for each supported agent on your computer.
+and configures the newest Data Agent Kit release for each supported agent on
+your computer. It uses upstream DAK setup to select BigQuery and AlloyDB, with
+notebook and visualization tools included by upstream. The plugin is
+`dak@dak-marketplace`; the data servers are `dak-bigquery` and `dak-alloydb`.
+Restart open agent sessions after setup.
+
+The selected project is saved in ignored `.workshop-state/project.env` and upstream's
+non-secret `~/.config/data-agent-kit/config.json`. Setup does not change the global
+gcloud project. A conflicting pre-existing DAK config or plugin installation stops
+setup; resolve it with upstream DAK or the agent's plugin commands, then retry.
+To move an installation owned by this checkout to a later release, run
+`./bin/teardown` and then `./bin/setup` again. Pre-existing installations are preserved.
 
 ```bash
-./bin/setup <INSERT_YOUR_GOOGLE_CLOUD_PROJECT_ID>
+./bin/setup YOUR_LAB_PROJECT_ID
 ```
-
-Before running doctor, sign in to your chosen CLI if needed: `codex login`, `claude auth login`, or `agy`.
 
 `./bin/doctor` runs read-only checks for the required software, agent CLI login,
 Google Cloud authentication, plugin installation, and MCP configuration.
@@ -65,7 +84,7 @@ Google Cloud authentication, plugin installation, and MCP configuration.
 ./bin/doctor
 ```
 
-### 4. Launch one agent
+### 3. Launch one agent
 
 Use a workshop launcher instead of running `codex`, `claude`, or `agy` directly so it
 can load the workshop credentials and project settings before starting the agent.
@@ -84,10 +103,28 @@ can load the workshop credentials and project settings before starting the agent
 
 Trust the repository when prompted. Keep this session open for the entire lab.
 
+## After the workshop: use your own project (optional)
+
+To continue after the lab expires, use an existing billing-enabled project you
+own. Install Python 3 and Google Cloud CLI with `bq`, then sign in with your own
+Google account and replace `YOUR_PROJECT_ID`:
+
+```bash
+gcloud auth login --project=YOUR_PROJECT_ID
+gcloud auth application-default login --project=YOUR_PROJECT_ID
+./bin/provision YOUR_PROJECT_ID
+./bin/setup YOUR_PROJECT_ID
+./bin/doctor
+```
+
+Allow about 15–20 minutes, then launch an agent as above. Provisioning creates
+billable resources, including AlloyDB, which keeps charging until removed.
+`./bin/teardown` removes local setup only.
+
 ## Connectivity check
 
 First, run `/mcp` in the agent and confirm that the Developer Knowledge, Maps
-Grounding Lite, Cloud Run, BigQuery, and AlloyDB MCP servers are loaded.
+Grounding Lite, Cloud Run, `dak-bigquery`, and `dak-alloydb` MCP servers are loaded.
 
 Then paste the following prompt into the same agent session and run it:
 

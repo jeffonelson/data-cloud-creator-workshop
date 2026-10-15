@@ -2,12 +2,27 @@
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+usage() {
+  echo "Usage: $0 [--preflight]"
+  echo "--preflight checks local prerequisites only; no sign-in or project is required."
+}
+
+preflight=false
+if (( $# > 1 )); then usage >&2; exit 2; fi
+case "${1:-}" in
+  '') ;;
+  --preflight) preflight=true ;;
+  --help|-h) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+
 # shellcheck source=lib/workshop-common.sh
 source "$repo_root/bin/lib/workshop-common.sh"
-workshop_load_config
-
-GCP_PROJECT_ID="$(workshop_saved_project)"
-workshop_source_env_local
+if [[ "$preflight" == false ]]; then
+  workshop_load_config
+  GCP_PROJECT_ID="$(workshop_saved_project)"
+  workshop_source_env_local
+fi
 
 failures=0
 warnings=0
@@ -24,12 +39,37 @@ check_command() {
     pass "$1 is installed"
   else
     fail "$1 is not installed"
+    [[ -z "${2:-}" ]] || echo "      Install: $2"
   fi
 }
 
-check_command gcloud
-check_command node
-check_command npm
+finish_checks() {
+  local summary
+  echo
+  printf -v summary '%s finished with %d failure(s) and %d warning(s).' "$1" "$failures" "$warnings"
+  if (( failures > 0 )); then
+    workshop_print_line "$WORKSHOP_SGR_RED" 1 "$summary"
+  elif (( warnings > 0 )); then
+    workshop_print_line "$WORKSHOP_SGR_YELLOW" 1 "$summary"
+  else
+    workshop_print_line "$WORKSHOP_SGR_GREEN" 1 "$summary"
+  fi
+  (( failures == 0 ))
+}
+
+check_command gcloud https://cloud.google.com/sdk/docs/install
+check_command node https://nodejs.org/en/download
+check_command npm https://nodejs.org/en/download
+if [[ "$preflight" == true ]]; then
+  check_command git https://git-scm.com/downloads
+  if command -v node >/dev/null 2>&1; then
+    if node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 6) ? 0 : 1)' >/dev/null 2>&1; then
+      pass "Node.js meets the DAK setup requirement (22.6 or newer)"
+    else
+      fail "Node.js cannot run or is older than 22.6; install the current LTS release from https://nodejs.org/en/download"
+    fi
+  fi
+fi
 
 has_codex=false
 has_claude=false
@@ -45,6 +85,18 @@ if command -v claude >/dev/null 2>&1; then
 fi
 if [[ "$has_codex" == false && "$has_claude" == false && "$has_antigravity" == false ]]; then
   fail "no supported coding agent is installed (Codex, Claude Code, or Antigravity)"
+  echo "      Install one supported agent using the prerequisite links in README.md."
+fi
+
+# Exit before reading project state, local overrides, or any user DAK settings.
+# Only command discovery and the local Node version check run in this mode.
+if [[ "$preflight" == true ]]; then
+  [[ "$has_antigravity" == false ]] || pass "Antigravity is installed"
+  echo
+  echo "Local prerequisites only; no sign-in, project, plugin, or MCP access was checked."
+  echo "Resolve any failures and rerun this check. On workshop day, run ./bin/setup PROJECT_ID, then ./bin/doctor."
+  finish_checks Preflight
+  exit $?
 fi
 
 if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
@@ -53,6 +105,24 @@ if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
 else
   unset GCP_PROJECT_ID
   fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID"
+fi
+
+# The Data Agent Kit version every agent on this machine should be running:
+# the DAK_REF override when set, otherwise the release setup recorded.
+expected_dak_ref="$(workshop_effective_dak_ref 2>/dev/null || true)"
+if [[ -n "$expected_dak_ref" ]]; then
+  if [[ -n "${DAK_REF:-}" ]]; then
+    pass "Data Agent Kit version is pinned by config/workshop.env ($expected_dak_ref)"
+  else
+    pass "Data Agent Kit release recorded by setup ($expected_dak_ref)"
+    # Informational only: an older release is not a fault, and the note should
+    # not turn an attendee's otherwise clean report yellow.
+    if latest_dak_release="$(workshop_latest_dak_release)" && [[ "$latest_dak_release" != "$expected_dak_ref" ]]; then
+      echo "      Newer Data Agent Kit release available ($latest_dak_release). To move to it: ./bin/teardown, then ./bin/setup PROJECT_ID"
+    fi
+  fi
+else
+  fail "no Data Agent Kit version is recorded; run: ./bin/setup PROJECT_ID"
 fi
 
 if command -v gcloud >/dev/null 2>&1 && [[ -n "${GCP_PROJECT_ID:-}" ]]; then
@@ -118,134 +188,55 @@ check_agent_login() {
   return 1
 }
 
-if [[ "$has_codex" == true ]] && check_agent_login Codex 'codex login' codex login status; then
-  if ! plugin_entry="$(workshop_agent_entry codex plugin)"; then
-    fail "Codex: could not read the installed plugin list"
-  elif [[ "$plugin_entry" != null ]]; then
-    pass "Codex: Data Agent Kit plugin is installed"
-  else
-    fail "Codex: Data Agent Kit plugin is not installed; run: ./bin/setup"
+check_dak_version() {
+  local report line
+  report="$(workshop_check_dak_installation "$1" "$expected_dak_ref")"
+  if [[ -z "$report" ]]; then
+    fail "$1: could not verify the Data Agent Kit installation"
+    return
   fi
+  while IFS= read -r line; do
+    case "$line" in
+      PASS\ *) pass "${line#PASS }" ;;
+      *) fail "${line#FAIL }; inspect the agent plugin installation, then rerun ./bin/setup PROJECT_ID" ;;
+    esac
+  done <<<"$report"
+}
 
-  mcp_json="$(cd "$repo_root" && codex mcp list --json 2>/dev/null)"
+for agent in codex claude; do
+  command -v "$agent" >/dev/null 2>&1 || continue
+  if [[ "$agent" == codex ]]; then
+    label=Codex
+    manifest=mcp.json
+    check_agent_login "$label" 'codex login' codex login status || continue
+    mcp_listing="$(cd "$repo_root" && codex mcp list --json 2>/dev/null)"
+  else
+    label='Claude Code'
+    manifest=.claude-plugin/mcp.json
+    check_agent_login "$label" 'claude auth login' claude auth status || continue
+    mcp_listing="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
+  fi
+  check_dak_version "$agent"
+  if plugin_root="$(workshop_dak_plugin_root "$agent")" &&
+     workshop_check_dak_configuration "$plugin_root" "$manifest" "$agent" &&
+     workshop_dak_settings check "${GCP_PROJECT_ID:-}"; then
+    pass "$label: DAK workshop services and upstream project settings are ready"
+  else
+    fail "$label: DAK configuration is incomplete or differs; run ./bin/setup PROJECT_ID"
+  fi
   for server in google_developer_knowledge maps_grounding_lite cloud_run; do
-    if grep -Fq "$server" <<<"$mcp_json"; then
-      pass "Codex: $server MCP configuration is visible"
+    if grep -Fq "$server" <<<"$mcp_listing"; then
+      pass "$label: $server MCP configuration is visible"
     else
-      warn "Codex: $server MCP is not visible; trust the project and restart Codex"
+      warn "$label: $server MCP is not visible; trust the project and restart the agent"
     fi
   done
-
-  if codex_proxy="$(workshop_dak_proxy_path codex)"; then
-    pass "Codex: Data Agent Kit MCP proxy found ($codex_proxy)"
+  if proxy="$(workshop_dak_proxy_path "$agent")"; then
+    pass "$label: Data Agent Kit MCP proxy found ($proxy)"
   else
-    fail "Codex: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
+    fail "$label: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
   fi
-fi
-
-if [[ "$has_claude" == true ]] && check_agent_login 'Claude Code' 'claude auth login' claude auth status; then
-  # Check what is actually installed rather than what setup declared, so a
-  # failed or partial install cannot report as healthy.
-  claude_marketplace_ref="$(
-    workshop_agent_entry claude marketplace | node -e '
-      const entry = JSON.parse(require("fs").readFileSync(0, "utf8"));
-      if (!entry) { console.log("__MISSING__"); }
-      else { console.log(entry.ref || "__DEFAULT_BRANCH__"); }
-    ' 2>/dev/null
-  )"
-
-  if [[ "$claude_marketplace_ref" == "__MISSING__" || -z "$claude_marketplace_ref" ]]; then
-    fail "Claude Code: marketplace $DAK_MARKETPLACE is not configured; run: ./bin/setup PROJECT_ID"
-  elif [[ -z "${DAK_REF:-}" ]]; then
-    if [[ "$claude_marketplace_ref" == "__DEFAULT_BRANCH__" ]]; then
-      pass "Claude Code: marketplace tracks the default branch"
-    else
-      fail "Claude Code: marketplace is pinned to ref $claude_marketplace_ref, but config/workshop.env pins no ref"
-    fi
-  elif [[ "$claude_marketplace_ref" == "$DAK_REF" ]]; then
-    pass "Claude Code: marketplace is pinned to ref $DAK_REF"
-  else
-    fail "Claude Code: marketplace ref is $claude_marketplace_ref; config/workshop.env expects $DAK_REF"
-  fi
-
-  claude_plugin_report="$(
-    workshop_agent_entry claude plugin | dak_plugin="$DAK_PLUGIN" node -e '
-      const fs = require("fs");
-      const entry = JSON.parse(fs.readFileSync(0, "utf8"));
-      const plugin = process.env.dak_plugin;
-      if (!entry) {
-        console.log("FAIL plugin " + plugin + " is not installed; run: ./bin/setup PROJECT_ID");
-      } else {
-        if (entry.enabled) {
-          console.log("PASS plugin " + plugin + " is installed and enabled (scope: " + entry.scope + ")");
-        } else {
-          console.log("FAIL plugin " + plugin + " is installed but disabled");
-        }
-        if (entry.installPath && !fs.existsSync(entry.installPath)) {
-          console.log("FAIL plugin files are missing from " + entry.installPath);
-        }
-        const servers = Object.keys(entry.mcpServers || {});
-        if (servers.length > 0) {
-          console.log("PASS plugin provides " + servers.length + " MCP server(s)");
-        } else {
-          console.log("WARN plugin declares no MCP servers");
-        }
-      }
-    ' 2>/dev/null
-  )"
-
-  if [[ -z "$claude_plugin_report" ]]; then
-    fail "Claude Code: could not read the installed plugin list"
-  else
-    while IFS= read -r line; do
-      case "$line" in
-        PASS\ *) pass "Claude Code: ${line#PASS }" ;;
-        WARN\ *) warn "Claude Code: ${line#WARN }" ;;
-        *) fail "Claude Code: ${line#FAIL }" ;;
-      esac
-    done <<<"$claude_plugin_report"
-  fi
-
-  # claude plugin install --config stores the plugin options in the user
-  # settings file, so verify them there rather than in the repository.
-  #
-  # GCP_REGION is the only option the plugin declares since DAK 0.10.1, and it
-  # is worth checking: it fills the region placeholder in the Dataproc MCP URL,
-  # and an unfilled placeholder makes that server register zero tools with no
-  # error message at all.
-  claude_user_settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-  claude_plugin_region="$(
-    claude_user_settings="$claude_user_settings" \
-    dak_plugin="$DAK_PLUGIN" \
-    node -e '
-      const fs = require("fs");
-      let settings = {};
-      try { settings = JSON.parse(fs.readFileSync(process.env.claude_user_settings, "utf8")); } catch (error) {}
-      const entry = (settings.pluginConfigs || {})[process.env.dak_plugin] || {};
-      console.log((entry.options || {}).GCP_REGION || "");
-    ' 2>/dev/null
-  )"
-  if [[ "$claude_plugin_region" == "$DAK_GCP_REGION" ]]; then
-    pass "Claude Code: plugin GCP_REGION matches config/workshop.env ($DAK_GCP_REGION)"
-  else
-    fail "Claude Code: plugin GCP_REGION is \"$claude_plugin_region\"; expected $DAK_GCP_REGION"
-  fi
-
-  claude_mcp="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
-  for server in google_developer_knowledge maps_grounding_lite cloud_run; do
-    if grep -Fq "$server" <<<"$claude_mcp"; then
-      pass "Claude Code: $server MCP configuration is visible"
-    else
-      warn "Claude Code: $server MCP is not visible; trust the project and restart Claude Code"
-    fi
-  done
-
-  if claude_proxy="$(workshop_dak_proxy_path claude)"; then
-    pass "Claude Code: Data Agent Kit MCP proxy found ($claude_proxy)"
-  else
-    fail "Claude Code: cannot locate the Data Agent Kit MCP proxy; the Cloud Run MCP will not start"
-  fi
-fi
+done
 
 # Cloud Run is the one MCP server here that answers tools/list without any
 # credential at all. A server that is merely "visible" therefore proves nothing:
@@ -342,24 +333,16 @@ if [[ "$has_antigravity" == true ]]; then
   else
     fail "Antigravity: setup is incomplete; run ./bin/setup PROJECT_ID"
   fi
-  if [[ -f "$repo_root/.workshop-state/antigravity-source/.workshop-ref" ]] &&
-     [[ "$(cat "$repo_root/.workshop-state/antigravity-source/.workshop-ref")" == "${DAK_REF:-HEAD}" ]]; then
-    pass "Antigravity: source ref matches config/workshop.env"
+  if [[ -n "$expected_dak_ref" ]] &&
+     [[ -f "$repo_root/.workshop-state/antigravity-source/.workshop-ref" ]] &&
+     [[ "$(cat "$repo_root/.workshop-state/antigravity-source/.workshop-ref")" == "$expected_dak_ref" ]]; then
+    pass "Antigravity: source is at Data Agent Kit $expected_dak_ref"
   else
-    fail "Antigravity: source ref is missing or differs from config/workshop.env"
+    fail "Antigravity: source is missing or at a different Data Agent Kit version; run ./bin/teardown, then ./bin/setup PROJECT_ID"
   fi
   warn "Antigravity: verify sign-in and live tools inside the app; CLI has no login-status command"
 fi
 
 check_cloud_run_mcp
 
-echo
-printf -v summary 'Doctor finished with %d failure(s) and %d warning(s).' "$failures" "$warnings"
-if (( failures > 0 )); then
-  workshop_print_line "$WORKSHOP_SGR_RED" 1 "$summary"
-elif (( warnings > 0 )); then
-  workshop_print_line "$WORKSHOP_SGR_YELLOW" 1 "$summary"
-else
-  workshop_print_line "$WORKSHOP_SGR_GREEN" 1 "$summary"
-fi
-(( failures == 0 ))
+finish_checks Doctor
