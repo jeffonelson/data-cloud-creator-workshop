@@ -38,7 +38,7 @@ proxy_path="${WORKSHOP_DAK_PROXY:-}"
 if [[ -z "$proxy_path" || ! -f "$proxy_path" ]]; then
   if ! proxy_path="$(workshop_dak_proxy_path)"; then
     echo "Cannot locate the Data Agent Kit MCP proxy for: $endpoint_url" >&2
-    echo "Install the plugin with ./bin/setup PROJECT_ID, then run ./bin/doctor." >&2
+    echo "Install the plugin with ./bin/setup PROJECT_ID --region REGION, then run ./bin/doctor." >&2
     exit 1
   fi
 fi

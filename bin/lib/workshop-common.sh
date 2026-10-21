@@ -119,6 +119,25 @@ workshop_project_id_is_valid() {
   [[ "${1:-}" =~ $PROJECT_ID_PATTERN ]]
 }
 
+workshop_region_is_valid() {
+  [[ "${1:-}" =~ ^[a-z]+(-[a-z]+)+[0-9]+$ ]]
+}
+
+# Read the selected project's region as data, never by sourcing project.env.
+# Older checkouts must rerun setup instead of silently assuming us-central1.
+workshop_load_project_region() {
+  local state_file region cloud_run_region
+  state_file="$(workshop_project_state_file)"
+  region="$(sed -n 's/^ALLOYDB_REGION=//p' "$state_file" 2>/dev/null)" || region=''
+  cloud_run_region="$(sed -n 's/^CLOUD_RUN_REGION=//p' "$state_file" 2>/dev/null)" || cloud_run_region=''
+  if ! workshop_region_is_valid "$region" || ! workshop_region_is_valid "$cloud_run_region"; then
+    workshop_error "No valid saved workshop region. Run: ./bin/setup PROJECT_ID --region REGION"
+    return 1
+  fi
+  DAK_GCP_REGION="$region"
+  CLOUD_RUN_REGION="$cloud_run_region"
+}
+
 # ---------------------------------------------------------------------------
 # Data Agent Kit version
 #
@@ -335,7 +354,7 @@ workshop_dak_settings() {
           fs.unlinkSync(marker);
         }
       } else if (mode === "check" || mode === "record") {
-        if (!equal(current, wanted)) throw Error("DAK project, region, or services differ; run ./bin/setup PROJECT_ID.");
+        if (!equal(current, wanted)) throw Error("DAK project, region, or services differ; run ./bin/setup PROJECT_ID --region REGION.");
         if (mode === "record" && owned)
           fs.writeFileSync(marker, JSON.stringify(wanted) + "\n", {mode:0o600});
       } else {
@@ -458,15 +477,16 @@ workshop_prepare_launch() {
 
   if [[ -z "$project_id" ]]; then
     workshop_error "No workshop project is configured."
-    workshop_hint "Run: ./bin/setup PROJECT_ID"
+    workshop_hint "Run: ./bin/setup PROJECT_ID --region REGION"
     return 1
   fi
 
   if ! workshop_project_id_is_valid "$project_id"; then
-    workshop_error "The saved workshop project ID is invalid. Run: ./bin/setup PROJECT_ID"
+    workshop_error "The saved workshop project ID is invalid. Run: ./bin/setup PROJECT_ID --region REGION"
     return 1
   fi
 
+  workshop_load_project_region || return 1
   workshop_dak_settings check "$project_id" || return 1
   workshop_export_project_env "$project_id"
   workshop_source_env_local

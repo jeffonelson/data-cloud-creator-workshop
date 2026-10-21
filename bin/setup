@@ -11,20 +11,29 @@ mkdir -p "$state_dir"
 project_state="$(workshop_project_state_file)"
 
 usage() {
-  echo "Usage: $0 [PROJECT_ID]"
+  echo "Usage: $0 [PROJECT_ID] [--region REGION]"
   echo "Installs one Data Agent Kit release and configures BigQuery and AlloyDB."
+  echo "Supply --region for a new project; retries reuse its saved region."
 }
 
 GCP_PROJECT_ID=''
-for argument in "$@"; do
-  case "$argument" in
+requested_region=''
+while (( $# )); do
+  case "$1" in
     --help|-h) usage; exit 0 ;;
+    --region)
+      (( $# >= 2 )) || { usage >&2; exit 2; }
+      requested_region="$2"
+      workshop_region_is_valid "$requested_region" || { workshop_error "Invalid --region value."; exit 2; }
+      shift
+      ;;
     -*) usage >&2; exit 2 ;;
     *)
       [[ -z "$GCP_PROJECT_ID" ]] || { echo "Supply only one project ID." >&2; exit 2; }
-      GCP_PROJECT_ID="$argument"
+      GCP_PROJECT_ID="$1"
       ;;
   esac
+  shift
 done
 [[ -n "$GCP_PROJECT_ID" ]] || GCP_PROJECT_ID="$(workshop_saved_project)"
 
@@ -38,6 +47,17 @@ if ! workshop_project_id_is_valid "$GCP_PROJECT_ID"; then
   workshop_error "Invalid Google Cloud project ID: $GCP_PROJECT_ID"
   exit 2
 fi
+
+if [[ -z "$requested_region" ]]; then
+  if [[ "$GCP_PROJECT_ID" == "$(workshop_saved_project)" ]]; then
+    workshop_load_project_region || exit 1
+    requested_region="$DAK_GCP_REGION"
+  else
+    workshop_error "Supply the lab region: ./bin/setup PROJECT_ID --region REGION"
+    exit 2
+  fi
+fi
+DAK_GCP_REGION="$requested_region"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -103,6 +123,10 @@ for secret_id in "$DK_SECRET_ID" "$MAPS_SECRET_ID"; do
   fi
 done
 
+CLOUD_RUN_REGION="${CLOUD_RUN_REGION:-$DAK_GCP_REGION}"
+workshop_region_is_valid "$CLOUD_RUN_REGION" || { workshop_error "Invalid CLOUD_RUN_REGION in config/workshop.env."; exit 1; }
+workshop_ok "AlloyDB region: $DAK_GCP_REGION; Cloud Run region: $CLOUD_RUN_REGION. BigQuery uses its dataset location."
+
 umask 077
 # Reject a conflicting shared upstream configuration before changing any agent.
 workshop_dak_settings preflight "$GCP_PROJECT_ID"
@@ -149,7 +173,7 @@ for agent in codex claude; do
   fi
 done
 
-printf 'GCP_PROJECT_ID=%s\n' "$GCP_PROJECT_ID" >"$project_state"
+printf 'GCP_PROJECT_ID=%s\nALLOYDB_REGION=%s\nCLOUD_RUN_REGION=%s\n' "$GCP_PROJECT_ID" "$DAK_GCP_REGION" "$CLOUD_RUN_REGION" >"$project_state"
 workshop_ok "Workshop project $GCP_PROJECT_ID and Secret Manager access are ready."
 
 setup_agent_dak() {

@@ -15,7 +15,7 @@ workshop_setup_antigravity() {
   local source_dir="$repo_root/.workshop-state/antigravity-source"
   local ref
   command -v git >/dev/null 2>&1 || { workshop_error 'Antigravity setup requires git.'; return 1; }
-  ref="$(workshop_effective_dak_ref)" || { workshop_error 'No Data Agent Kit version is recorded; run ./bin/setup PROJECT_ID.'; return 1; }
+  ref="$(workshop_effective_dak_ref)" || { workshop_error 'No Data Agent Kit version is recorded; run ./bin/setup PROJECT_ID --region REGION.'; return 1; }
   # Record ownership before fetching so interrupted downloads can be retried.
   if [[ ! -e "$source_dir" ]]; then
     touch "$repo_root/.workshop-state/antigravity-source-added-by-workshop"
@@ -31,7 +31,7 @@ workshop_setup_antigravity() {
     git -C "$source_dir" checkout -q --detach FETCH_HEAD || return 1
     printf '%s\n' "$ref" > "$source_dir/.workshop-ref"
   elif [[ "$(cat "$source_dir/.workshop-ref")" != "$ref" ]]; then
-    workshop_error 'Antigravity source is at a different Data Agent Kit version. Run ./bin/teardown, then ./bin/setup PROJECT_ID.'
+    workshop_error 'Antigravity source is at a different Data Agent Kit version. Run ./bin/teardown, then ./bin/setup PROJECT_ID --region REGION.'
     return 1
   fi
   # Retain the workshop desktop discovery path, but let upstream generate the

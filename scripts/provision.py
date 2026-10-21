@@ -247,8 +247,8 @@ class Provisioner:
     def preflight(self):
         self.validate_bundle()
         config = config_values(ROOT / "config/workshop.env")
-        if config.get("DAK_GCP_REGION") != REGION or config.get("CLOUD_RUN_REGION") != REGION:
-            raise ProvisionError("Self-service scenario provisioning currently requires us-central1 in config/workshop.env.")
+        if any(config.get(key) not in (None, "", REGION) for key in ("DAK_GCP_REGION", "CLOUD_RUN_REGION")):
+            raise ProvisionError("Self-service provisioning uses us-central1; leave region overrides empty or set them to us-central1 in config/workshop.env.")
         for command in ("gcloud", "bq"):
             if not shutil.which(command):
                 raise ProvisionError(f"Missing {command}. Install the Google Cloud CLI (including bq).")
@@ -642,7 +642,7 @@ class Provisioner:
                     if not already_failing:
                         raise
         info(f"Project ready: {self.project}", kind="success")
-        info(f"Next: ./bin/setup {self.project}\n          ./bin/doctor", kind="detail")
+        info(f"Next: ./bin/setup {self.project} --region {REGION}\n          ./bin/doctor", kind="detail")
 
 
 def prepare_bundle(output):

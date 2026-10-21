@@ -94,7 +94,7 @@ if [[ "$preflight" == true ]]; then
   [[ "$has_antigravity" == false ]] || pass "Antigravity is installed"
   echo
   echo "Local prerequisites only; no sign-in, project, plugin, or MCP access was checked."
-  echo "Resolve any failures and rerun this check. On workshop day, run ./bin/setup PROJECT_ID, then ./bin/doctor."
+  echo "Resolve any failures and rerun this check. On workshop day, run ./bin/setup PROJECT_ID --region REGION, then ./bin/doctor."
   finish_checks Preflight
   exit $?
 fi
@@ -104,7 +104,23 @@ if workshop_project_id_is_valid "${GCP_PROJECT_ID:-}"; then
   workshop_export_project_env "$GCP_PROJECT_ID"
 else
   unset GCP_PROJECT_ID
-  fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID"
+  fail "no valid workshop project is configured; run: ./bin/setup PROJECT_ID --region REGION"
+fi
+
+# Region state is shared by all agents and must not fall back to a default.
+region_ready=false
+if workshop_load_project_region; then
+  region_ready=true
+  pass "saved AlloyDB region: $DAK_GCP_REGION; Cloud Run region: $CLOUD_RUN_REGION (BigQuery location is separate)"
+  if [[ -n "${GCP_PROJECT_ID:-}" ]] && command -v gcloud >/dev/null 2>&1; then
+    if gcloud alloydb clusters describe mcp-retail-cluster --project="$GCP_PROJECT_ID" --region="$DAK_GCP_REGION" >/dev/null 2>&1; then
+      pass "mcp-retail-cluster is accessible in $DAK_GCP_REGION"
+    else
+      fail "cannot verify the workshop cluster in the saved region; check lab readiness, IAM and the supplied --region"
+    fi
+  fi
+else
+  fail "workshop region is missing or invalid; rerun ./bin/setup PROJECT_ID --region REGION"
 fi
 
 # The Data Agent Kit version every agent on this machine should be running:
@@ -118,11 +134,11 @@ if [[ -n "$expected_dak_ref" ]]; then
     # Informational only: an older release is not a fault, and the note should
     # not turn an attendee's otherwise clean report yellow.
     if latest_dak_release="$(workshop_latest_dak_release)" && [[ "$latest_dak_release" != "$expected_dak_ref" ]]; then
-      echo "      Newer Data Agent Kit release available ($latest_dak_release). To move to it: ./bin/teardown, then ./bin/setup PROJECT_ID"
+      echo "      Newer Data Agent Kit release available ($latest_dak_release). To move to it: ./bin/teardown, then ./bin/setup PROJECT_ID --region REGION"
     fi
   fi
 else
-  fail "no Data Agent Kit version is recorded; run: ./bin/setup PROJECT_ID"
+  fail "no Data Agent Kit version is recorded; run: ./bin/setup PROJECT_ID --region REGION"
 fi
 
 if command -v gcloud >/dev/null 2>&1 && [[ -n "${GCP_PROJECT_ID:-}" ]]; then
@@ -198,7 +214,7 @@ check_dak_version() {
   while IFS= read -r line; do
     case "$line" in
       PASS\ *) pass "${line#PASS }" ;;
-      *) fail "${line#FAIL }; inspect the agent plugin installation, then rerun ./bin/setup PROJECT_ID" ;;
+      *) fail "${line#FAIL }; inspect the agent plugin installation, then rerun ./bin/setup PROJECT_ID --region REGION" ;;
     esac
   done <<<"$report"
 }
@@ -217,12 +233,12 @@ for agent in codex claude; do
     mcp_listing="$(cd "$repo_root" && claude mcp list 2>/dev/null)"
   fi
   check_dak_version "$agent"
-  if plugin_root="$(workshop_dak_plugin_root "$agent")" &&
+  if [[ "$region_ready" == true ]] && plugin_root="$(workshop_dak_plugin_root "$agent")" &&
      workshop_check_dak_configuration "$plugin_root" "$manifest" "$agent" &&
      workshop_dak_settings check "${GCP_PROJECT_ID:-}"; then
     pass "$label: DAK workshop services and upstream project settings are ready"
   else
-    fail "$label: DAK configuration is incomplete or differs; run ./bin/setup PROJECT_ID"
+    fail "$label: DAK configuration is incomplete or differs; run ./bin/setup PROJECT_ID --region REGION"
   fi
   for server in google_developer_knowledge maps_grounding_lite cloud_run; do
     if grep -Fq "$server" <<<"$mcp_listing"; then
@@ -245,6 +261,11 @@ done
 # tool for real and require a real result.
 check_cloud_run_mcp() {
   local token request response verdict
+
+  if [[ "$region_ready" != true ]]; then
+    fail "Cloud Run MCP: no valid saved region; rerun ./bin/setup PROJECT_ID --region REGION"
+    return
+  fi
 
   if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
     fail "Cloud Run MCP: no workshop project is configured"
@@ -328,17 +349,17 @@ check_cloud_run_mcp() {
 }
 
 if [[ "$has_antigravity" == true ]]; then
-  if workshop_antigravity_config check; then
+  if [[ "$region_ready" == true ]] && workshop_dak_settings check "${GCP_PROJECT_ID:-}" && workshop_antigravity_config check; then
     pass "Antigravity: configuration and skills are ready"
   else
-    fail "Antigravity: setup is incomplete; run ./bin/setup PROJECT_ID"
+    fail "Antigravity: setup is incomplete; run ./bin/setup PROJECT_ID --region REGION"
   fi
   if [[ -n "$expected_dak_ref" ]] &&
      [[ -f "$repo_root/.workshop-state/antigravity-source/.workshop-ref" ]] &&
      [[ "$(cat "$repo_root/.workshop-state/antigravity-source/.workshop-ref")" == "$expected_dak_ref" ]]; then
     pass "Antigravity: source is at Data Agent Kit $expected_dak_ref"
   else
-    fail "Antigravity: source is missing or at a different Data Agent Kit version; run ./bin/teardown, then ./bin/setup PROJECT_ID"
+    fail "Antigravity: source is missing or at a different Data Agent Kit version; run ./bin/teardown, then ./bin/setup PROJECT_ID --region REGION"
   fi
   warn "Antigravity: verify sign-in and live tools inside the app; CLI has no login-status command"
 fi

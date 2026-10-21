@@ -7,7 +7,8 @@ source "$repo_root/bin/lib/workshop-common.sh"
 workshop_load_config
 [[ $# == 1 ]] || { echo 'Expected one MCP server name.' >&2; exit 2; }
 project_id="$(workshop_saved_project)"
-workshop_project_id_is_valid "$project_id" || { echo 'Run ./bin/setup PROJECT_ID before starting Antigravity MCP servers.' >&2; exit 1; }
+workshop_project_id_is_valid "$project_id" || { echo 'Run ./bin/setup PROJECT_ID --region REGION before starting Antigravity MCP servers.' >&2; exit 1; }
+workshop_load_project_region
 workshop_dak_settings check "$project_id"
 workshop_export_project_env "$project_id"
 export WORKSHOP_DAK_PROXY="$repo_root/.workshop-state/antigravity-source/$DAK_PROXY_RELATIVE_PATH"

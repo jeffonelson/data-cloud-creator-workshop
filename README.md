@@ -66,15 +66,19 @@ notebook and visualization tools included by upstream. The plugin is
 `dak@dak-marketplace`; the data servers are `dak-bigquery` and `dak-alloydb`.
 Restart open agent sessions after setup.
 
+Use the project ID and region supplied by your Skills lab. Skills can prefill
+both values in the setup command. Setup saves them for subsequent launches.
+BigQuery uses its own dataset location; Cloud Run follows the selected region.
+
 The selected project is saved in ignored `.workshop-state/project.env` and upstream's
 non-secret `~/.config/data-agent-kit/config.json`. Setup does not change the global
 gcloud project. A conflicting pre-existing DAK config or plugin installation stops
 setup; resolve it with upstream DAK or the agent's plugin commands, then retry.
 To move an installation owned by this checkout to a later release, run
-`./bin/teardown` and then `./bin/setup` again. Pre-existing installations are preserved.
+`./bin/teardown` and then `./bin/setup PROJECT_ID --region REGION` again. Pre-existing installations are preserved.
 
 ```bash
-./bin/setup YOUR_LAB_PROJECT_ID
+./bin/setup YOUR_LAB_PROJECT_ID --region YOUR_LAB_REGION
 ```
 
 `./bin/doctor` runs read-only checks for the required software, agent CLI login,
@@ -83,6 +87,9 @@ Google Cloud authentication, plugin installation, and MCP configuration.
 ```bash
 ./bin/doctor
 ```
+
+Existing checkouts must rerun setup with --region once. Doctor verifies cluster
+access in that region and checks that the agents' settings agree.
 
 ### 3. Launch one agent
 
@@ -113,7 +120,7 @@ Google account and replace `YOUR_PROJECT_ID`:
 gcloud auth login --project=YOUR_PROJECT_ID
 gcloud auth application-default login --project=YOUR_PROJECT_ID
 ./bin/provision YOUR_PROJECT_ID
-./bin/setup YOUR_PROJECT_ID
+./bin/setup YOUR_PROJECT_ID --region us-central1
 ./bin/doctor
 ```
 
@@ -134,7 +141,7 @@ Use the MCP tools for these checks. Make one successful read-only call to each s
 1. Developer Knowledge: retrieve the official BigQuery row-level security documentation.
 2. Maps: find two coffee shops near Golden Gate Park and include their Google Maps links.
 3. BigQuery: list datasets in the workshop project.
-4. AlloyDB: list clusters in us-central1.
+4. AlloyDB: list clusters in the configured workshop region.
 
 Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
 ```
