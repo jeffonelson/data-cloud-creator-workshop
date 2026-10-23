@@ -25,8 +25,6 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from workshop_documents import DocumentError, DocumentStore, validate_documents
 OWNER = "data-cloud-creator"
 LABELS = {"managed-by": OWNER, "datacloud": "workshop"}
 DESCRIPTION = "Managed by data-cloud-creator self-service provisioning v1"
@@ -130,8 +128,6 @@ class Cloud:
             "Authorization": "Bearer " + self.token,
             "Content-Type": content_type, "Accept": "application/json",
         }
-        if url.startswith("https://storage.googleapis.com/"):
-            headers["User-Agent"] = "gcs-skills/1.0 (skill:google-cloud-storage-basics)"
         if quota_project:
             headers["x-goog-user-project"] = self.project
         request = Request(url, data=data, method=method, headers=headers)
@@ -219,10 +215,7 @@ class Provisioner:
         self.project = cloud.project
         self.bundle = Path(bundle)
         self.manifest = json.loads((self.bundle / "manifest.json").read_text())
-        # Keep the pre-documents checkpoint digest: adding/revising documents
-        # must not force a reset of an attendee's database tables or reviews.
-        table_manifest = {k: v for k, v in self.manifest.items() if k != "documents"}
-        self.seed = hashlib.sha256((json.dumps(table_manifest, indent=2, sort_keys=True) + "\n").encode()).hexdigest()
+        self.seed = hashlib.sha256((self.bundle / "manifest.json").read_bytes()).hexdigest()
         self.schema = hashlib.sha256((self.bundle / "sql/alloydb-schema.sql").read_bytes()).hexdigest()
         self.bucket = self.project + "-workshop-data"
         self.storage = "https://storage.googleapis.com/storage/v1/b/" + self.bucket
@@ -250,7 +243,6 @@ class Provisioner:
         for name in ("alloydb-schema.sql", "alloydb-comments.sql", "customer-feedback.sql"):
             if not (self.sql_dir / name).is_file():
                 raise ProvisionError("Incomplete seed bundle: missing " + name)
-        validate_documents(self.bundle, self.manifest)
 
     def preflight(self):
         self.validate_bundle()
@@ -295,7 +287,6 @@ class Provisioner:
         # API enablement happens before these reads so DISABLED_API is never
         # mistaken for a missing resource. No resources are adopted on 403.
         cfg = config_values(ROOT / "config/workshop.env")
-        DocumentStore(self.cloud, self.bundle).inspect(self.number)
         checks = [(self.storage, self.bucket, False), (self.alloy, CLUSTER, False),
                   (self.alloy + "/instances/" + INSTANCE, INSTANCE, False),
                   (self.bq + "/datasets/" + DATASET, DATASET, False),
@@ -592,8 +583,6 @@ class Provisioner:
 
     def verify(self):
         info("Verifying data, federation and BigQuery AI...")
-        DocumentStore(self.cloud, self.bundle).verify()
-        info("Cloud Storage: all 12 lease PDFs verified.", kind="success")
         # Check that the scenario is usable without treating attendee edits as
         # grounds for silently resetting their data.
         info("Checking AlloyDB scenario integrity...", kind="detail")
@@ -625,8 +614,6 @@ class Provisioner:
         self.acquire()
         try:
             self.prepare_state(reset)
-            info("Preparing Charlie's lease documents in Cloud Storage...")
-            DocumentStore(self.cloud, self.bundle).upload(self.number)
             self.network()
             password = self.password()
             self.alloydb(password)
@@ -677,6 +664,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", args.project_id):
         parser.error("Invalid Google Cloud project ID.")
+    provisioner_class, error_types = Provisioner, (ProvisionError,)
+    # The source checkout includes an extension omitted from attendee exports.
+    if (ROOT / "scripts/workshop_documents.py").is_file():
+        from workshop_documents import DocumentError, with_documents
+        provisioner_class = with_documents(Provisioner)
+        error_types += (DocumentError,)
     try:
         bundle = ROOT / "data/seed"
         with tempfile.TemporaryDirectory(prefix="workshop-seed-") as temp:
@@ -685,11 +678,11 @@ def main(argv=None):
                     raise ProvisionError("Seed bundle missing. Use a complete workshop checkout.")
                 bundle = Path(temp) / "seed"
                 prepare_bundle(bundle)
-            Provisioner(Cloud(args.project_id), bundle).execute(args.reset_data, args.yes)
+            provisioner_class(Cloud(args.project_id), bundle).execute(args.reset_data, args.yes)
         return 0
     except Exception as exc:
         # Malformed cloud data must not produce a traceback with local values.
-        message = str(exc) if isinstance(exc, (ProvisionError, DocumentError)) else "Unexpected local file or cloud response. Check that the checkout is complete and retry."
+        message = str(exc) if isinstance(exc, error_types) else "Unexpected local file or cloud response. Check that the checkout is complete and retry."
         info("ERROR: " + message, kind="error", stream=sys.stderr)
         return 1
     except (KeyboardInterrupt, EOFError):

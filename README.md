@@ -124,6 +124,13 @@ gcloud auth application-default login --project=YOUR_PROJECT_ID
 ./bin/doctor
 ```
 
+This checkout provisions the original database/CSV scenario and MCP credentials.
+Lease PDFs are prepared by organizers and are not bundled or uploaded here.
+To recreate the full workshop, including the Cloud Storage leases, use the
+[upstream recreation instructions](https://github.com/jeffonelson/svl-custom-plugin#self-service-populate-your-own-project).
+Until the leases are added, the lease check in `./bin/doctor` and the lease exercise
+will not pass; the database exercises remain available.
+
 Allow about 15–20 minutes, then launch an agent as above. Provisioning creates
 billable resources, including AlloyDB, which keeps charging until removed.
 `./bin/teardown` removes local setup only.
