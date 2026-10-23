@@ -61,7 +61,7 @@ are prepared by the organizers; skip provisioning for your assigned lab project.
 
 `./bin/setup` checks access to your project and secrets, then installs
 and configures the newest Data Agent Kit release for each supported agent on
-your computer. It uses upstream DAK setup to select BigQuery and AlloyDB, with
+your computer. It uses upstream DAK setup to select BigQuery, AlloyDB and Cloud Storage, with
 notebook and visualization tools included by upstream. The plugin is
 `dak@dak-marketplace`; the data servers are `dak-bigquery` and `dak-alloydb`.
 Restart open agent sessions after setup.
@@ -131,7 +131,8 @@ billable resources, including AlloyDB, which keeps charging until removed.
 ## Connectivity check
 
 First, run `/mcp` in the agent and confirm that the Developer Knowledge, Maps
-Grounding Lite, Cloud Run, `dak-bigquery`, and `dak-alloydb` MCP servers are loaded.
+Grounding Lite, Cloud Run, BigQuery, AlloyDB, and Cloud Storage MCP servers are loaded.
+Cloud Storage comes from the Data Agent Kit and uses your Google Cloud credentials.
 
 Then paste the following prompt into the same agent session and run it:
 
@@ -142,8 +143,12 @@ Use the MCP tools for these checks. Make one successful read-only call to each s
 2. Maps: find two coffee shops near Golden Gate Park and include their Google Maps links.
 3. BigQuery: list datasets in the workshop project.
 4. AlloyDB: list clusters in the configured workshop region.
+5. Cloud Storage: list the objects under leases/ in the workshop project's
+   PROJECT_ID-charlies-documents bucket. Confirm there are 12 PDFs.
 
-Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
+Use the project selected during setup, replacing PROJECT_ID with that ID.
+Return a five-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as
+PASS; missing lease PDFs need organizer attention.
 ```
 
 ## Data landscape
@@ -151,7 +156,13 @@ Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PA
 [![Preview of Charlie's Coffee data landscape](assets/data-landscape-preview.png)](https://jeffonelson.github.io/data-cloud-creator-workshop/data-landscape.html)
 
 [Open the interactive data landscape](https://jeffonelson.github.io/data-cloud-creator-workshop/data-landscape.html)
-to explore the tables, their grain, and the relationships between them.
+to explore the tables, documents, and relationships between them.
+
+The broker's documents are available in
+`gs://PROJECT_ID-charlies-documents/leases/`, one PDF per `candidate_sites.site_id`.
+Use your setup-selected project ID. The documents are available throughout the lab.
+Developer Knowledge provides official Google Cloud documentation; Maps Grounding
+Lite supplies current place and route context with Google Maps attribution.
 
 ## Charlie's expansion scenario
 
@@ -164,14 +175,20 @@ next. Run the suggested prompts for the shortest path through the scenario, then
 choose any optional follow-ups that match your interests and available time.
 Continue in the same agent session so later prompts can build on earlier findings.
 
+The suggested path uses **Developer Knowledge → business data → a shortlist →
+Google Maps → broker documents**. Record your recommendation before the
+facilitator calls the room together. These are fictional business records; Maps
+provides real-world context around the scenario's representative locations.
+
 ### Frame the decision
 
 #### Suggested prompt
 
 ```text
-According to the official Google Cloud documentation, why might AlloyDB be a
-better home for live inventory than BigQuery, and when would that choice stop
-making sense?
+Use the Developer Knowledge MCP to explain why Charlie's might keep live
+inventory in AlloyDB, sales and market history in BigQuery, and broker PDFs in
+Cloud Storage. Cite official Google Cloud documentation. How can an agent
+bring these sources together to help choose a location?
 ```
 
 #### Optional follow-ups
@@ -223,7 +240,9 @@ Which complaints match specific store/product pairs, and which are ambiguous?
 
 ```text
 Use BigQuery AI.FORECAST to forecast six months of candidate-market demand.
-Which site looks best after estimating store revenue and accounting for rent?
+Recommend one site and one runner-up after estimating store revenue and
+accounting for asking rent. Explain how market demand becomes store revenue.
+Label the result as a comparison, not profit: other operating costs are missing.
 ```
 
 #### Optional follow-ups
@@ -241,9 +260,76 @@ against Charlie's existing stores.
 What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
 ```
 
+Write down this first recommendation and its main assumption. Then test it with
+Maps and the broker documents below.
+
+### Test the recommendation in the real world
+
+#### Suggested prompt
+
+```text
+Use Maps Grounding Lite to compare the surroundings of my recommended SF site
+and runner-up. What nearby places strengthen or weaken each case? Include
+every returned Google Maps source link immediately after the claim it supports
+and preserve its attribution. Distinguish observed places from assumptions
+about their effect on sales.
+```
+
+#### Optional follow-ups
+
+```text
+Does nearby coffee competition indicate saturation, or does it validate demand?
+```
+
+```text
+Which nearby residential areas could expand Charlie’s delivery reach through DoorDash or Uber Eats? Use Maps to compare driving times from the site.
+```
+
+```text
+Which nearby residential buildings and neighborhood anchors are within a 10-minute walk of the site and could contribute launch-day foot traffic?
+```
+
+### Check the broker's documents
+
+Before settling on your recommendation, give both finalists a document check.
+The broker has supplied one draft per candidate site in Cloud Storage. If you
+already explored them, use this step to audit your comparison.
+
+#### Suggested prompt
+
+```text
+Use Cloud Storage MCP to read the broker PDFs for my recommended site and
+runner-up in gs://PROJECT_ID-charlies-documents/leases/. Use my setup-selected
+project ID and match the documents to candidate_sites by site_id.
+
+Check our rent assumptions against the proposed terms. Compare monthly base
+rent, other recurring property charges, and the length of the commitment.
+Cite the document, page and section for each finding. Separate stated amounts,
+estimates and unknowns. Does this change your recommendation or confidence?
+```
+
+#### Optional follow-up
+
+```text
+Audit the revised comparison. Are the amounts monthly or annual? Did we count
+anything twice? Keep refundable deposits separate from recurring expenses.
+What would we need the broker to confirm before making a commitment?
+```
+
+If PDF reading fails, tell the facilitator and run `./bin/doctor`; a successful
+listing alone does not prove the agent can read a PDF. The exported checkout
+also contains the identical files in `data/seed/leases/` for a clearly identified
+local fallback. Do not invent terms or treat missing costs as zero.
+
 > **⏸️ Facilitator checkpoint**
 >
-> Once your agent recommends a specific site, write it down. Continue exploring until the facilitator calls the room back together.
+> Record your current choice, runner-up, one reason supported by a source, and
+> one assumption that could change your mind. Continue exploring until the
+> facilitator calls the room back together.
+
+## Further exploration
+
+The remaining activities are for extra workshop time or continued exploration afterward.
 
 ### Make it local
 
@@ -265,34 +351,6 @@ worth exploring, informed by what we learned from its San Francisco stores.
 Which area looks most promising, and what would we need to verify?
 Pick a specific map anchor for a hypothetical store to explore next.
 ```
-
-### Test the recommendation in the real world
-
-#### Suggested prompt
-
-```text
-Use Maps to stress-test your recommended SF expansion spot. What nearby evidence
-strengthens or weakens the case? Include the Google Maps source link
-immediately after every place-based claim.
-```
-
-#### Optional follow-ups
-
-```text
-Does nearby coffee competition indicate saturation, or does it validate demand?
-```
-
-```text
-Which nearby residential areas could expand Charlie’s delivery reach through DoorDash or Uber Eats? Use Maps to compare driving times from the site.
-```
-
-```text
-Which nearby residential buildings and neighborhood anchors are within a 10-minute walk of the site and could contribute launch-day foot traffic?
-```
-
-## Further exploration
-
-The remaining activities are for extra workshop time or continued exploration afterward.
 
 ### Plan the launch
 

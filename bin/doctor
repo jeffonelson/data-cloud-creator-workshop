@@ -364,6 +364,59 @@ if [[ "$has_antigravity" == true ]]; then
   warn "Antigravity: verify sign-in and live tools inside the app; CLI has no login-status command"
 fi
 
+check_cloud_storage_mcp() {
+  local token request response verdict
+  if [[ -z "${GCP_PROJECT_ID:-}" ]]; then
+    fail "Cloud Storage MCP: no workshop project is configured"
+    return
+  fi
+  if ! token="$(gcloud auth application-default print-access-token --project="$GCP_PROJECT_ID" 2>/dev/null)" || [[ -z "$token" ]]; then
+    fail "Cloud Storage MCP: no ADC access token; run: gcloud auth application-default login"
+    return
+  fi
+  printf -v request \
+    '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_objects","arguments":{"bucketName":"%s-charlies-documents","prefix":"leases/","recursive":true,"pageSize":100}}}' \
+    "$GCP_PROJECT_ID"
+  if ! response="$(
+    printf 'header = "Authorization: Bearer %s"\n' "$token" |
+      curl --fail --silent --max-time 30 --config - \
+        --header 'Content-Type: application/json' \
+        --header 'Accept: application/json, text/event-stream' \
+        --header 'User-Agent: gcs-skills/1.0 (skill:google-cloud-storage-basics)' \
+        --header "x-goog-user-project: $GCP_PROJECT_ID" \
+        --request POST https://storage.googleapis.com/storage/mcp \
+        --data "$request" 2>/dev/null
+  )"; then
+    unset token
+    fail "Cloud Storage MCP: listing failed; check ADC, project IAM, Storage API and the provisioned documents bucket"
+    return
+  fi
+  unset token
+  verdict="$(node -e '
+    const raw = require("fs").readFileSync(0,"utf8");
+    try {
+      const docs = raw.trim().startsWith("{") ? [JSON.parse(raw)] :
+        raw.split(/\r?\n\r?\n/).map(event=>event.split(/\r?\n/).filter(line=>line.startsWith("data:")).map(line=>line.slice(5).trim()).join("\n")).filter(Boolean).map(JSON.parse);
+      const doc = docs.find(d=>d.jsonrpc==="2.0" && d.id===1);
+      if (!doc || doc.error || !doc.result || doc.result.isError) throw Error();
+      const result = doc.result;
+      let listing = result.structuredContent;
+      if (!listing) {
+        listing = (result.content || []).filter(c=>c.type==="text").map(c=>{try{return JSON.parse(c.text);}catch{return null;}}).find(c=>Array.isArray(c?.objectNames));
+      }
+      const expected = Array.from({length:12},(_,i)=>`leases/SITE-${String(i+1).padStart(3,"0")}-lease.pdf`);
+      if (!listing || listing.nextPageToken || !Array.isArray(listing.objectNames) || listing.objectNames.length!==12 || !expected.every(n=>listing.objectNames.includes(n))) {
+        console.log("FAIL expected all 12 lease PDFs; ask the organizer to provision or verify the documents bucket");
+      } else console.log("PASS list_objects found all 12 leases; PDF reading still needs an in-agent check");
+    } catch { console.log("FAIL invalid or rejected tool response; check Storage API, ADC and project IAM"); }
+  ' <<<"$response" 2>/dev/null)"
+  case "$verdict" in
+    PASS\ *) pass "Cloud Storage MCP: ${verdict#PASS }" ;;
+    *) fail "Cloud Storage MCP: ${verdict#FAIL }" ;;
+  esac
+}
+
 check_cloud_run_mcp
+check_cloud_storage_mcp
 
 finish_checks Doctor

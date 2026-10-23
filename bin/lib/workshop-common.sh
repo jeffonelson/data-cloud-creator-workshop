@@ -346,7 +346,7 @@ workshop_dak_settings() {
     const read = p => fs.existsSync(p) ? JSON.parse(fs.readFileSync(p,"utf8")) : null;
     try {
       const current = read(file), owned = read(marker);
-      const wanted = {projectId:project, region, services:["BigQuery", "AlloyDB"]};
+      const wanted = {projectId:project, region, services:["BigQuery", "AlloyDB", "Cloud Storage"]};
       if (mode === "remove") {
         if (owned) {
           if (equal(current, owned)) fs.unlinkSync(file);
@@ -391,7 +391,7 @@ workshop_configure_dak() {
   env -u ANTIGRAVITY_AGENT -u ANTIGRAVITY_CONVERSATION_ID -u CLAUDECODE \
     -u CLAUDE_CODE_ENTRYPOINT -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u PLUGIN_ROOT \
     "$indicator" node "$plugin_root/skills/dak-setup/scripts/dak-setup.js" save \
-    --project-id "$project" --region "$DAK_GCP_REGION" --services BigQuery AlloyDB || return 1
+    --project-id "$project" --region "$DAK_GCP_REGION" --services BigQuery AlloyDB "Cloud Storage" || return 1
   # DAK 1.1.0 can report a write failure with exit status zero. Verify outputs.
   workshop_dak_settings record "$project" || return 1
   workshop_check_dak_configuration "$plugin_root" "$manifest"
@@ -402,7 +402,7 @@ workshop_check_dak_configuration() {
     try {
       const fs = require("fs"), path = require("path"), root = process.argv[1];
       const servers = JSON.parse(fs.readFileSync(path.join(root, process.argv[2]), "utf8")).mcpServers;
-      const names = ["dak-bigquery", "dak-alloydb", "dak-notebook", "dak-viz"];
+      const names = ["dak-bigquery", "dak-alloydb", "dak-gcs", "dak-notebook", "dak-viz"];
       // Codex can restore the upstream catalog after setup. Extra upstream
       // servers do not invalidate the workshop services; never rewrite its cache.
       const allowExtra = process.argv[3] === "codex";

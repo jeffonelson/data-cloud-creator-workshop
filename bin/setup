@@ -12,7 +12,7 @@ project_state="$(workshop_project_state_file)"
 
 usage() {
   echo "Usage: $0 [PROJECT_ID] [--region REGION]"
-  echo "Installs one Data Agent Kit release and configures BigQuery and AlloyDB."
+  echo "Installs one Data Agent Kit release and configures BigQuery, AlloyDB and Cloud Storage."
   echo "Supply --region for a new project; retries reuse its saved region."
 }
 

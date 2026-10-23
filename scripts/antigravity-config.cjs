@@ -74,7 +74,7 @@ function main() {
   // retained desktop discovery path; no copied manifest or URL translation.
   const upstream = path.join(source, 'mcp_config.json');
   const native = read(upstream);
-  if (!native.mcpServers?.['dak-bigquery'] || !native.mcpServers?.['dak-alloydb'] ||
+  if (!native.mcpServers?.['dak-bigquery'] || !native.mcpServers?.['dak-alloydb'] || !native.mcpServers?.['dak-gcs'] ||
       !fs.existsSync(path.join(source,proxySuffix))) throw new Error('Incomplete DAK checkout; run setup again.');
   for (const entry of Object.values(native.mcpServers)) {
     // Resolve against the installed plugin, never the attendee's current folder.

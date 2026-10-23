@@ -256,6 +256,10 @@
       gap: 16px;
     }
 
+    .storage { grid-column: 1 / -1; --engine-accent: #a56a13; }
+    html[data-theme="dark"] .storage { --engine-accent: var(--google-yellow); }
+    .storage .engine-header { border-top: 4px solid #fbbc04; }
+
     .engine {
       overflow: hidden;
       border: 1px solid var(--rule);
@@ -543,7 +547,7 @@
           </svg>
         </button>
       </div>
-      <p class="lede">Live operations sit in AlloyDB. Historical performance, market demand, locations, and reviews sit in BigQuery.</p>
+      <p class="lede">Live operations sit in AlloyDB. Historical performance, market demand, locations, and reviews sit in BigQuery. Broker documents sit in Cloud Storage.</p>
     </header>
 
     <section class="relationship-rail" aria-labelledby="relationship-heading">
@@ -554,6 +558,7 @@
         <button class="relationship-button" type="button" data-relationship="inventory_sales" aria-pressed="false">Inventory vs. sales</button>
         <button class="relationship-button" type="button" data-relationship="zip_context" aria-pressed="false">ZIP context</button>
         <button class="relationship-button" type="button" data-relationship="store_reviews" aria-pressed="false">Store reviews</button>
+        <button class="relationship-button" type="button" data-relationship="site_documents" aria-pressed="false">Site documents</button>
       </div>
       <div class="relationship-summary" aria-live="polite">
         <code data-relationship-expression>stores.store_id = historical_sales.store_id</code>
@@ -590,8 +595,17 @@
           <li><button class="table-button" type="button" data-table="historical_sales" data-keys="store_id sku zip_code" aria-pressed="false"><code class="table-name">historical_sales</code><span class="table-grain">weekly sales by store and product</span><span class="row-count">15.6k rows</span></button></li>
           <li><button class="table-button" type="button" data-table="market_demand" data-keys="zip_code" aria-pressed="true"><code class="table-name">market_demand</code><span class="table-grain">weekly coffee demand by ZIP</span><span class="row-count">1,560 rows</span></button></li>
           <li><button class="table-button" type="button" data-table="demographics_and_traffic" data-keys="zip_code" aria-pressed="false"><code class="table-name">demographics_and_traffic</code><span class="table-grain">population and foot traffic by ZIP</span><span class="row-count">15 rows</span></button></li>
-          <li><button class="table-button" type="button" data-table="candidate_sites" data-keys="zip_code" aria-pressed="false"><code class="table-name">candidate_sites</code><span class="table-grain">one prospective property</span><span class="row-count">12 rows</span></button></li>
+          <li><button class="table-button" type="button" data-table="candidate_sites" data-keys="site_id zip_code" aria-pressed="false"><code class="table-name">candidate_sites</code><span class="table-grain">one prospective property</span><span class="row-count">12 rows</span></button></li>
           <li><button class="table-button" type="button" data-table="customer_feedback" data-keys="store_id zip_code" aria-pressed="false"><code class="table-name">customer_feedback</code><span class="table-grain">one store or competitor review</span><span class="row-count">300 rows</span></button></li>
+        </ul>
+      </section>
+      <section class="engine storage" aria-labelledby="storage-heading">
+        <header class="engine-header">
+          <div><h2 class="engine-name" id="storage-heading">Cloud Storage</h2><span class="engine-kind">Broker documents</span></div>
+          <p class="engine-purpose">Proposed terms for each site</p>
+        </header>
+        <ul class="table-list">
+          <li><button class="table-button" type="button" data-table="lease_documents" data-keys="site_id" aria-pressed="false"><code class="table-name">lease_documents</code><span class="table-grain">one broker PDF per candidate site</span><span class="row-count">12 PDFs</span></button></li>
         </ul>
       </section>
     </div>
@@ -674,8 +688,15 @@
         engine: "BigQuery",
         description: "Twelve fictional commercial properties available for Charlie's seventh store.",
         grain: "one prospective property",
-        keys: ["zip_code"],
-        use: "Comparing space, rent, and location after identifying promising ZIPs."
+        keys: ["site_id", "zip_code"],
+        use: "Comparing space, asking rent, and location; matching the broker document by site_id."
+      },
+      lease_documents: {
+        engine: "Cloud Storage",
+        description: "Fictional broker drafts in gs://PROJECT_ID-charlies-documents/leases/. Use your setup-selected project ID. This is a document collection, not a SQL table.",
+        grain: "one PDF per candidate site",
+        keys: ["site_id"],
+        use: "Checking proposed terms against the site comparison, with document, page and section citations."
       },
       customer_feedback: {
         engine: "BigQuery",
@@ -718,6 +739,11 @@
         tables: ["demographics_and_traffic", "market_demand", "candidate_sites"],
         expression: "market_demand.zip_code = demographics_and_traffic.zip_code = candidate_sites.zip_code",
         note: "Demand is weekly and more than one site can share a ZIP. Account for grain before aggregating."
+      },
+      site_documents: {
+        tables: ["candidate_sites", "lease_documents"],
+        expression: "candidate_sites.site_id ↔ PDF filename and site ID",
+        note: "Read the PDF through Cloud Storage and reconcile it with the candidate row. This relationship is not a SQL join."
       },
       store_reviews: {
         tables: ["stores", "customer_feedback"],

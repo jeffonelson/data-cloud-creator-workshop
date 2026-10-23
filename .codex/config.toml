@@ -55,9 +55,28 @@ approval_mode = "auto"
 [mcp_servers.cloud_run.tools.list_services]
 approval_mode = "auto"
 
-# Upstream dak-setup selects BigQuery and AlloyDB in the installed plugin.
-# It also supplies its notebook and visualization tools. No copied DAK server
-# list is maintained here; the three workshop additions above remain separate.
+# Upstream setup selects BigQuery, AlloyDB and Cloud Storage, plus notebook/viz.
+# Codex can restore DAK's full bundled catalog after setup. That larger catalog
+# can hide Storage from the model even when the MCP connection is healthy.
+# Keep the workshop selection using supported plugin policy, not copied server
+# commands or edits to the installed cache. These switches apply only here.
+[plugins."dak@dak-marketplace".mcp_servers.dak-bigtable]
+enabled = false
+
+[plugins."dak@dak-marketplace".mcp_servers.dak-bigtable-data]
+enabled = false
+
+[plugins."dak@dak-marketplace".mcp_servers.dak-cloudsql]
+enabled = false
+
+[plugins."dak@dak-marketplace".mcp_servers.dak-kc]
+enabled = false
+
+[plugins."dak@dak-marketplace".mcp_servers.dak-spanner]
+enabled = false
+
+[plugins."dak@dak-marketplace".mcp_servers.dak-spark]
+enabled = false
 
 # Keep the API keys available to Codex's HTTP MCP client, but do not forward
 # them into shell commands launched by the agent. The legacy exclusion array
