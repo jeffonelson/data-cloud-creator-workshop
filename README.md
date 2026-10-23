@@ -3,10 +3,10 @@
 A hands-on workshop using AI coding agents and Google Cloud data tools to explore
 a coffee shop expansion scenario.
 
-Prepare your computer a few days before the workshop. Your Skills/Qwiklabs lab
-will provide the Google Cloud project and access instructions on workshop day;
-you do not need to create a personal Cloud project, billing account, or free trial.
-Afterward, you can [recreate the workshop in your own project](#after-the-workshop-use-your-own-project-optional).
+Prepare your computer before starting. If you are attending a workshop or
+Skills/Qwiklabs lab, use the Google Cloud project and access instructions
+provided by your organizer; you do not need a personal billing account or free trial.
+If you are exploring independently, [prepare your own project](#after-the-workshop-use-your-own-project-optional).
 
 ## Before the workshop: check your computer
 
@@ -40,18 +40,23 @@ using the installation links and rerun until there are zero failures.
 A passing preflight confirms local prerequisites only. Agent sign-in, Google
 authentication, project permissions, plugins, and live tools are checked later.
 
-## Workshop day: connect your assigned project
+## Connect your Google Cloud project
 
-### 1. Sign in for the lab
+### 1. Sign in to Google Cloud
 
-Follow the lab's instructions to obtain your assigned project ID and the identity
-to use. Authenticate as that identity; replace `YOUR_LAB_PROJECT_ID` below with
-the assigned project ID:
+Replace `YOUR_USERNAME` with your Google account email address and
+`YOUR_PROJECT_ID` with the project you will use. If you have an assigned lab
+project, use the credentials supplied by the lab.
 
 ```bash
-gcloud auth login --project=YOUR_LAB_PROJECT_ID
-gcloud auth application-default login --project=YOUR_LAB_PROJECT_ID
+gcloud auth login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
+gcloud auth application-default login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
 ```
+
+When sign-in is needed, `--no-launch-browser` prints an authorization URL instead
+of opening your default browser; paste it into the browser profile for that
+account (or an Incognito/private window for temporary lab credentials), then
+follow the terminal prompts.
 
 Sign in to your chosen agent CLI if needed: `codex login`, `claude auth login`,
 or `agy`. Agent sign-in is separate from Google Cloud sign-in. Workshop resources
@@ -66,8 +71,8 @@ notebook and visualization tools included by upstream. The plugin is
 `dak@dak-marketplace`; the data servers are `dak-bigquery` and `dak-alloydb`.
 Restart open agent sessions after setup.
 
-Use the project ID and region supplied by your Skills lab. Skills can prefill
-both values in the setup command. Setup saves them for subsequent launches.
+Use your project ID and its AlloyDB region. For an assigned lab, use the values
+supplied by the lab. Setup saves them for subsequent launches.
 BigQuery uses its own dataset location; Cloud Run follows the selected region.
 
 The selected project is saved in ignored `.workshop-state/project.env` and upstream's
@@ -78,7 +83,7 @@ To move an installation owned by this checkout to a later release, run
 `./bin/teardown` and then `./bin/setup PROJECT_ID --region REGION` again. Pre-existing installations are preserved.
 
 ```bash
-./bin/setup YOUR_LAB_PROJECT_ID --region YOUR_LAB_REGION
+./bin/setup YOUR_PROJECT_ID --region YOUR_REGION
 ```
 
 `./bin/doctor` runs read-only checks for the required software, agent CLI login,
@@ -112,13 +117,14 @@ Trust the repository when prompted. Keep this session open for the entire lab.
 
 ## After the workshop: use your own project (optional)
 
-To continue after the lab expires, use an existing billing-enabled project you
-own. Install Python 3 and Google Cloud CLI with `bq`, then sign in with your own
-Google account and replace `YOUR_PROJECT_ID`:
+To explore independently or continue after a lab expires, use an existing
+billing-enabled project you own. Install Python 3 and Google Cloud CLI with `bq`,
+then replace `YOUR_USERNAME` with your Google account email address and
+`YOUR_PROJECT_ID` with your project ID:
 
 ```bash
-gcloud auth login --project=YOUR_PROJECT_ID
-gcloud auth application-default login --project=YOUR_PROJECT_ID
+gcloud auth login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
+gcloud auth application-default login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
 ./bin/provision YOUR_PROJECT_ID
 ./bin/setup YOUR_PROJECT_ID --region us-central1
 ./bin/doctor
@@ -324,9 +330,8 @@ What would we need the broker to confirm before making a commitment?
 ```
 
 If PDF reading fails, tell the facilitator and run `./bin/doctor`; a successful
-listing alone does not prove the agent can read a PDF. The exported checkout
-also contains the identical files in `data/seed/leases/` for a clearly identified
-local fallback. Do not invent terms or treat missing costs as zero.
+listing alone does not prove the agent can read a PDF. Do not invent terms or
+treat missing costs as zero.
 
 > **⏸️ Facilitator checkpoint**
 >
