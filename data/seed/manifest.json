@@ -1,8 +1,8 @@
 {
-  "anchor_date": "2026-09-01",
+  "anchor_date": "2026-10-26",
   "brand": "Charlie's Coffee",
   "city": "San Francisco",
-  "note": "Row counts and columns are stable. Checksums shift with anchor_date because dated columns move.",
+  "note": "Fresh generation can change values and row counts with anchor_date. A snapshot preserves the published values and shifts only dates.",
   "schema_version": "3.0",
   "tables": {
     "candidate_sites": {
@@ -19,7 +19,7 @@
         "listed_date"
       ],
       "row_count": 12,
-      "sha256": "7cfd19390dcad309d2a8a377e70b8bafe22f3c1bce3918a3015c3c354db442b9",
+      "sha256": "8324d383fbbfd81fab8978fdd042913ce129485e59ffe4e1506cc24fb523c43b",
       "target": "bigquery"
     },
     "demographics_and_traffic": {
@@ -56,7 +56,7 @@
         "topic"
       ],
       "row_count": 300,
-      "sha256": "1847a107866f317367c904d7c16dc933987ccb9cab27d26c3fcb6bd39785ffcf",
+      "sha256": "0b89e47f5a59c75e3965406ed9a5c9804b73f5b2b017eb6aa8f1d2722b7a70a4",
       "target": "bigquery"
     },
     "historical_sales": {
@@ -69,7 +69,7 @@
         "net_revenue"
       ],
       "row_count": 15600,
-      "sha256": "7987542dd8eeb25d2afcef383a48ad3d7e3f5715867d57958a2f89c9ebc43370",
+      "sha256": "64eb1674492e9979c25683476fd761efb4b80bbf4915a0534f67765977a41630",
       "target": "bigquery"
     },
     "inventory": {
@@ -81,7 +81,7 @@
         "last_counted_at"
       ],
       "row_count": 150,
-      "sha256": "7871178a5eb952a274995c6c28b4fd7badbf5fb7c724bea146094b2f5f0dd499",
+      "sha256": "43470b430d70d22449f9a1e2c4257cd6c1c201d4f62714c88da99d6b693c3aa2",
       "target": "alloydb"
     },
     "market_demand": {
@@ -93,7 +93,7 @@
         "avg_ticket"
       ],
       "row_count": 1560,
-      "sha256": "1a54ac1e2f486854e2e22cffa90e8eeab28e66652218c64c922ec2a16a2beca4",
+      "sha256": "42cceb3287f16128d90ffe9e25017e16139c41d7971ddec50c5f17fe787e140f",
       "target": "bigquery"
     },
     "products": {
@@ -118,8 +118,8 @@
         "quantity_delta",
         "occurred_at"
       ],
-      "row_count": 10116,
-      "sha256": "074eaeae4b4b5ef22d0c26e0e320cc86a428a423191058541a73edcfb7a720b5",
+      "row_count": 9948,
+      "sha256": "27f21a3ee2cf3edaa29fcc3f44492ff9c3538701affe3b7afc8275e8fe84b5a9",
       "target": "alloydb"
     },
     "stores": {
@@ -139,5 +139,5 @@
       "target": "alloydb"
     }
   },
-  "total_rows": 27784
+  "total_rows": 27616
 }
