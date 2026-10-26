@@ -23,17 +23,17 @@ required = false
 
 # Cloud Run takes no API key: bin/mcp-dak-proxy runs the Data Agent Kit's
 # bundled proxy, which authenticates with the attendee's own Application
-# Default Credentials. Codex does not expand environment variables inside args,
-# so the command is a repository-relative path and the launcher's working
-# directory is what resolves it. env_vars forwards the resolved proxy location;
-# without it the script falls back to resolving the path itself.
+# Default Credentials. Invoke Bash explicitly so Windows can start this script.
+# The launcher's working directory resolves the repository-relative script path.
+# Codex does not expand environment variables inside args; env_vars forwards
+# the resolved proxy location. Without it the script resolves the path itself.
 #
 # The two read-only tools are approved automatically. The deploy tools are not:
 # they create and replace real services, and a prompt before that is worth the
 # few seconds it costs.
 [mcp_servers.cloud_run]
-command = "./bin/mcp-dak-proxy"
-args = ["https://run.googleapis.com/mcp"]
+command = "bash"
+args = ["./bin/mcp-dak-proxy", "https://run.googleapis.com/mcp"]
 env_vars = ["WORKSHOP_DAK_PROXY"]
 enabled_tools = [
   "get_service",

@@ -12,4 +12,5 @@ workshop_dak_settings check "$project_id"
 workshop_antigravity_config check
 workshop_export_project_env "$project_id"
 cd "$repo_root"
+export DO_NOT_TRACK="${DO_NOT_TRACK:-1}"
 exec "$agy_path" "$@"

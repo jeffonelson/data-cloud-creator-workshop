@@ -18,4 +18,5 @@ workshop_info "Launching Claude Code for project: $WORKSHOP_PROJECT_ID"
 # WORKSHOP_DK_API_KEY and WORKSHOP_MAPS_API_KEY remain visible to shell commands
 # the agent runs. Workshop exercises must not dump the environment.
 cd "$repo_root"
+export DO_NOT_TRACK="${DO_NOT_TRACK:-1}"
 exec claude "$@"

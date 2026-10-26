@@ -43,6 +43,22 @@ check_command() {
   fi
 }
 
+check_python() {
+  local python_command
+  # Execute the interpreter: Windows app aliases can exist without Python.
+  for python_command in python3 python; do
+    if command -v "$python_command" >/dev/null 2>&1 &&
+       "$python_command" -c 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)' </dev/null >/dev/null 2>&1; then
+      pass "Python 3 runs via $python_command"
+      return
+    fi
+  done
+  fail "Python 3 cannot run; install it and make python3 or python available in this terminal"
+  echo "      Install: https://www.python.org/downloads/"
+  echo "      On Windows: winget install --id Python.Python.3.14 --exact --source winget --scope user"
+  echo "      Close and reopen your terminal after installation, then rerun ./bin/doctor --preflight."
+}
+
 finish_checks() {
   local summary
   echo
@@ -60,6 +76,7 @@ finish_checks() {
 check_command gcloud https://cloud.google.com/sdk/docs/install
 check_command node https://nodejs.org/en/download
 check_command npm https://nodejs.org/en/download
+check_python
 if [[ "$preflight" == true ]]; then
   check_command git https://git-scm.com/downloads
   if command -v node >/dev/null 2>&1; then
@@ -89,7 +106,7 @@ if [[ "$has_codex" == false && "$has_claude" == false && "$has_antigravity" == f
 fi
 
 # Exit before reading project state, local overrides, or any user DAK settings.
-# Only command discovery and the local Node version check run in this mode.
+# Only command discovery and local Python/Node runtime checks run in this mode.
 if [[ "$preflight" == true ]]; then
   [[ "$has_antigravity" == false ]] || pass "Antigravity is installed"
   echo

@@ -15,4 +15,5 @@ workshop_prepare_launch codex
 workshop_info "Launching Codex for project: $WORKSHOP_PROJECT_ID"
 
 cd "$repo_root"
+export DO_NOT_TRACK="${DO_NOT_TRACK:-1}"
 exec codex "$@"

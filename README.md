@@ -14,10 +14,21 @@ Install these prerequisites using their official instructions:
 
 - [Git](https://git-scm.com/downloads)
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+- [Python 3](https://www.python.org/downloads/), runnable as `python3` or `python`
 - [Node.js 22.6 or newer and npm](https://nodejs.org/en/download) (current LTS recommended)
 - One supported agent: [Codex CLI](https://developers.openai.com/codex/cli/),
   [Claude Code CLI](https://code.claude.com/docs/en/setup), or
   [Antigravity CLI](https://www.antigravity.google/docs/cli/install/)
+
+On Windows, use Git Bash for the workshop commands. Install Python for that
+terminal too; Google Cloud CLI's bundled Python may not be found by its Bash
+launcher. You can install Python with:
+
+```bash
+winget install --id Python.Python.3.14 --exact --source winget --scope user
+```
+
+Close and reopen Git Bash after installation.
 
 Clone the repository:
 
@@ -32,9 +43,11 @@ Then check local prerequisites:
 ./bin/doctor --preflight
 ```
 
-This checks command availability and the minimum Node.js version. It makes no
-cloud requests, starts no login flow, and installs or configures nothing. No
-Google sign-in, project, or credit card is required. Fix any reported failures
+This checks command availability, runs `python3` or `python` to confirm Python 3,
+and checks the minimum Node.js version. A Windows app alias without a working
+Python interpreter does not pass. It makes no cloud requests, starts no login
+flow, and installs or configures nothing. No Google sign-in, project, or credit
+card is required. Fix any reported failures
 using the installation links and rerun until there are zero failures.
 
 A passing preflight confirms local prerequisites only. Agent sign-in, Google
@@ -112,6 +125,10 @@ can load the workshop credentials and project settings before starting the agent
 ```bash
 ./bin/workshop-antigravity
 ```
+
+All three CLI launchers default `DO_NOT_TRACK=1` for the agent session and its
+child processes. This opts out of DAK telemetry and avoids its Windows console
+pop-ups. An explicitly set `DO_NOT_TRACK` value is preserved.
 
 Trust the repository when prompted. Keep this session open for the entire lab.
 
