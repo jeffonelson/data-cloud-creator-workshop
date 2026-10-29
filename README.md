@@ -6,7 +6,6 @@ a coffee shop expansion scenario.
 Prepare your computer before starting. If you are attending a workshop or
 Skills/Qwiklabs lab, use the Google Cloud project and access instructions
 provided by your organizer; you do not need a personal billing account or free trial.
-If you are exploring independently, [prepare your own project](#after-the-workshop-use-your-own-project-optional).
 
 ## Before the workshop: check your computer
 
@@ -73,7 +72,7 @@ follow the terminal prompts.
 
 Sign in to your chosen agent CLI if needed: `codex login`, `claude auth login`,
 or `agy`. Agent sign-in is separate from Google Cloud sign-in. Workshop resources
-are prepared by the organizers; skip provisioning for your assigned lab project.
+are prepared by the organizers.
 
 ### 2. Configure and verify
 
@@ -115,48 +114,25 @@ Use a workshop launcher instead of running `codex`, `claude`, or `agy` directly 
 can load the workshop credentials and project settings before starting the agent.
 
 ```bash
-./bin/workshop-codex
+./bin/workshop-codex -m gpt-6.1-terra -c model_reasoning_effort=medium
 ```
 
 ```bash
-./bin/workshop-claude
+./bin/workshop-claude --model sonnet --effort medium
 ```
 
 ```bash
-./bin/workshop-antigravity
+./bin/workshop-antigravity --model gemini-3.8-flash-medium
 ```
+
+These commands start the models we tested for this lab. To try a more capable
+model in Codex CLI or Claude Code CLI, run `/model` in your session.
 
 All three CLI launchers default `DO_NOT_TRACK=1` for the agent session and its
 child processes. This opts out of DAK telemetry and avoids its Windows console
 pop-ups. An explicitly set `DO_NOT_TRACK` value is preserved.
 
 Trust the repository when prompted. Keep this session open for the entire lab.
-
-## After the workshop: use your own project (optional)
-
-To explore independently or continue after a lab expires, use an existing
-billing-enabled project you own. Install Python 3 and Google Cloud CLI with `bq`,
-then replace `YOUR_USERNAME` with your Google account email address and
-`YOUR_PROJECT_ID` with your project ID:
-
-```bash
-gcloud auth login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
-gcloud auth application-default login YOUR_USERNAME --project=YOUR_PROJECT_ID --no-launch-browser
-./bin/provision YOUR_PROJECT_ID
-./bin/setup YOUR_PROJECT_ID --region us-central1
-./bin/doctor
-```
-
-This checkout provisions the original database/CSV scenario and MCP credentials.
-Lease PDFs are prepared by organizers and are not bundled or uploaded here.
-To recreate the full workshop, including the Cloud Storage leases, use the
-[upstream recreation instructions](https://github.com/jeffonelson/svl-custom-plugin#self-service-populate-your-own-project).
-Until the leases are added, the lease check in `./bin/doctor` and the lease exercise
-will not pass; the database exercises remain available.
-
-Allow about 15–20 minutes, then launch an agent as above. Provisioning creates
-billable resources, including AlloyDB, which keeps charging until removed.
-`./bin/teardown` removes local setup only.
 
 ## Connectivity check
 
@@ -170,16 +146,16 @@ Then paste the following prompt into the same agent session and run it:
 Use the MCP tools for these checks. Make one successful read-only call to each service:
 
 1. Developer Knowledge: retrieve the official BigQuery row-level security documentation.
-2. Maps: find two coffee shops near Golden Gate Park and include their Google Maps links.
-3. BigQuery: list datasets in the workshop project.
-4. AlloyDB: list clusters in the configured workshop region.
-5. Cloud Storage: list the objects under leases/ in the workshop project's
-   PROJECT_ID-charlies-documents bucket. Confirm there are 12 PDFs.
+2. Maps: find two coffee shops near the de Young Museum in Golden Gate Park and include their Google Maps links.
+3. BigQuery: list datasets in project PROJECT_ID.
+4. AlloyDB: list clusters in REGION.
 
-Use the project selected during setup, replacing PROJECT_ID with that ID.
-Return a five-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as
-PASS; missing lease PDFs need organizer attention.
+Return a four-row PASS/FAIL table. Empty BigQuery or AlloyDB results count as PASS.
+
+For the rest of this session, run the analysis yourself with these tools and show me the results.
 ```
+
+Replace `PROJECT_ID` and `REGION` with the values you used for `./bin/setup`.
 
 ## Data landscape
 
@@ -200,6 +176,8 @@ Lite supplies current place and route context with Google Maps attribution.
 >
 > Recommend Charlie’s next San Francisco location and be prepared to defend it. The prompts below are suggestions, not a required sequence. Ask your own questions and follow whichever evidence interests you.
 
+> **Tip:** If your agent hands you a notebook or script to run instead of results, reply: `Run it yourself with the MCP tools and show me the results.`
+
 Charlie's Coffee operates six San Francisco stores and is choosing where to open
 next. Run the suggested prompts for the shortest path through the scenario, then
 choose any optional follow-ups that match your interests and available time.
@@ -215,10 +193,9 @@ provides real-world context around the scenario's representative locations.
 #### Suggested prompt
 
 ```text
-Use the Developer Knowledge MCP to explain why Charlie's might keep live
-inventory in AlloyDB, sales and market history in BigQuery, and broker PDFs in
-Cloud Storage. Cite official Google Cloud documentation. How can an agent
-bring these sources together to help choose a location?
+According to the official Google Cloud documentation, why might AlloyDB be a
+better home for live inventory than BigQuery, and when would that choice stop
+making sense?
 ```
 
 #### Optional follow-ups
@@ -236,7 +213,7 @@ Charlie's wants to open a seventh San Francisco store. Help me make a recommenda
 #### Suggested prompt
 
 ```text
-Where is Charlie's inventory failing to meet customer demand?
+Look across our cloud databases: where is Charlie's inventory failing to meet customer demand?
 ```
 
 #### Optional follow-ups
@@ -270,9 +247,7 @@ Which complaints match specific store/product pairs, and which are ambiguous?
 
 ```text
 Use BigQuery AI.FORECAST to forecast six months of candidate-market demand.
-Recommend one site and one runner-up after estimating store revenue and
-accounting for asking rent. Explain how market demand becomes store revenue.
-Label the result as a comparison, not profit: other operating costs are missing.
+Which site looks best after estimating store revenue and accounting for rent?
 ```
 
 #### Optional follow-ups
@@ -290,19 +265,14 @@ against Charlie's existing stores.
 What assumptions have the most influence on the ranking, and what would need to change for the runner-up to win?
 ```
 
-Write down this first recommendation and its main assumption. Then test it with
-Maps and the broker documents below.
-
 ### Test the recommendation in the real world
 
 #### Suggested prompt
 
 ```text
-Use Maps Grounding Lite to compare the surroundings of my recommended SF site
-and runner-up. What nearby places strengthen or weaken each case? Include
-every returned Google Maps source link immediately after the claim it supports
-and preserve its attribution. Distinguish observed places from assumptions
-about their effect on sales.
+Use Maps to stress-test your recommended SF expansion spot. What nearby evidence
+strengthens or weakens the case? Include the Google Maps source link
+immediately after every place-based claim.
 ```
 
 #### Optional follow-ups
@@ -319,31 +289,28 @@ Which nearby residential areas could expand Charlie’s delivery reach through D
 Which nearby residential buildings and neighborhood anchors are within a 10-minute walk of the site and could contribute launch-day foot traffic?
 ```
 
-### Check the broker's documents
+### Check the broker's lease terms
 
-Before settling on your recommendation, give both finalists a document check.
-The broker has supplied one draft per candidate site in Cloud Storage. If you
-already explored them, use this step to audit your comparison.
+Before locking in your recommendation, there is one more source of evidence: the commercial broker has uploaded draft lease PDFs to Cloud Storage for the candidate storefronts.
 
 #### Suggested prompt
 
 ```text
-Use Cloud Storage MCP to read the broker PDFs for my recommended site and
-runner-up in gs://PROJECT_ID-charlies-documents/leases/. Use my setup-selected
-project ID and match the documents to candidate_sites by site_id.
-
-Check our rent assumptions against the proposed terms. Compare monthly base
-rent, other recurring property charges, and the length of the commitment.
-Cite the document, page and section for each finding. Separate stated amounts,
-estimates and unknowns. Does this change your recommendation or confidence?
+There are draft lease PDFs from the broker in Cloud Storage. Read them with the
+Cloud Storage MCP, then check the lease terms for your recommended site and top
+alternatives. Do the actual rent, recurring charges, or lease conditions change
+your recommendation?
 ```
 
-#### Optional follow-up
+#### Optional follow-ups
 
 ```text
-Audit the revised comparison. Are the amounts monthly or annual? Did we count
-anything twice? Keep refundable deposits separate from recurring expenses.
-What would we need the broker to confirm before making a commitment?
+Cite the document, page, and section for the most important lease findings.
+Are any charges counted twice or missing from candidate_sites?
+```
+
+```text
+What should we ask the broker to clarify or renegotiate before signing?
 ```
 
 If PDF reading fails, tell the facilitator and run `./bin/doctor`; a successful
@@ -352,9 +319,8 @@ treat missing costs as zero.
 
 > **⏸️ Facilitator checkpoint**
 >
-> Record your current choice, runner-up, one reason supported by a source, and
-> one assumption that could change your mind. Continue exploring until the
-> facilitator calls the room back together.
+> Write down your recommended site. Did the lease terms change it? Continue
+> exploring until the facilitator calls the room back together.
 
 ## Further exploration
 
@@ -412,8 +378,9 @@ Revise the launch plan based on what you discovered.
 #### Suggested prompt
 
 ```text
-Build an interactive BI dashboard that helps our team explore Charlie's sales,
-inventory, and market demand. Highlight the most interesting findings.
+Build a good-looking, interactive single-page dashboard of Charlie's sales,
+inventory, and market demand as one HTML file in this folder, using a snapshot
+of the data. Highlight the most interesting findings.
 ```
 
 #### Optional follow-ups
@@ -423,7 +390,7 @@ Audit the dashboard's numbers and labels against the source data.
 ```
 
 ```text
-Deploy the dashboard to Cloud Run so our team can revisit it. Return the live URL.
+Deploy the dashboard as a public service with the Cloud Run MCP. Return the live URL.
 ```
 
 
